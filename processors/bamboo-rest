@@ -1,4 +1,5 @@
 #!/usr/bin/python
+import re
 import sys
 import getopt
 import urllib2
@@ -24,15 +25,18 @@ def usage(): # {{{
 	print '       generic Deferred Data adapter.'
 	print 'Options:'
 	print ' -h, --help           Print this help message'
-	print ' -d, --device=DEV     Use DEV as the SevOne device name; default: bamboo'
-	print ' -a, --address=ADDR   Use ADDR as the Bamboo url; default: http://DEV/'
 	print ' -u, --username=USER  Required; use USER as the username for Bamboo'
 	print ' -p, --password=PASS  Required; use PASS as the password for Bamboo'
+	print ' -d, --device=DEV     Use DEV as the SevOne device name; default: bamboo'
+	print ' -a, --address=ADDR   Use ADDR as the Bamboo url; default: http://DEV/'
+	print ' -b, --backfill       Rather than only including the test runs returned'
+	print '                      by the API, use each key and attempt to use all runs'
+	print '                      for each plan, from 1 to the first entry returned'
 # }}}
 
 # parse command-line arguments {{{
 try:
-	opts, args = getopt.getopt(sys.argv[1:], 'a:u:p:h', ['help', 'address=', 'username=', 'password='])
+	opts, args = getopt.getopt(sys.argv[1:], 'd:a:u:p:bh', ['device=', 'address=', 'username=', 'password=', 'backfill', 'help'])
 except getopt.GetoptError, err:
 	print str(err)
 	usage()
@@ -43,6 +47,7 @@ bambooUrlOverride = False
 bambooUrl = None
 username = None
 password = None
+backfill = False
 
 for o, a in opts:
 	if(o == '-d' or o == '--device'):
@@ -54,6 +59,8 @@ for o, a in opts:
 		username = a
 	elif(o == '-p' or o == '--password'):
 		password = a
+	elif(o == '-b' or o == '--backfill'):
+		backfill = True
 	elif(o == '-h' or o == '--help'):
 		usage()
 		sys.exit()
@@ -118,19 +125,34 @@ def handleGranularTestNode(key, details): # {{{
 	return output
 # }}}
 
+def outputRun(key): # {{{
+	details = curlJson('/latest/result/' + key)
+	# start the output line with the timestamp and object name
+	outputStr = getItemTimestamp(details) + ' "' + key + '" '
+	if(details['buildTestSummary'] == 'No tests found'):
+		outputStr += '"Bamboo Boolean Test" ' + handleBooleanTestNode(key, details)
+	else:
+		outputStr += '"Bamboo Granular Test" ' + handleGranularTestNode(key, details)
+	print outputStr
+# }}}
+
+maxNumRegex = re.compile('([0-9]+)$')
 def handleFeed(key): # {{{
 	results = curlJson('/latest/result/' + key)
 	results = results['results']['result']
-	for result in results:
-		jsonSuccess = False
-		details = curlJson('/latest/result/' + result['key'])
-		# start the output line with the timestamp and object name
-		outputStr = getItemTimestamp(details) + ' "' + key + '" '
-		if(details['buildTestSummary'] == 'No tests found'):
-			outputStr += '"Bamboo Boolean Test" ' + handleBooleanTestNode(key, details)
+	if(backfill):
+		match = maxNumRegex.search(results[0]['key'])
+		maxNum = 1
+		if(match):
+			maxNum = int(match.group(1))
+			for i in xrange(1, maxNum):
+				outputRun(key + '-' + str(i))
 		else:
-			outputStr += '"Bamboo Granular Test" ' + handleGranularTestNode(key, details)
-		print outputStr
+			for result in results:
+				outputRun(result['key'])
+	else:
+		for result in results:
+			outputRun(result['key'])
 # }}}
 
 plans = curlJson('/latest/plan')
