@@ -1,0 +1,138 @@
+#!/usr/bin/python
+import sys
+import getopt
+import urllib2
+import calendar
+import json
+#import argparse
+from datetime import datetime
+from datetime import timedelta
+from urllib2 import URLError
+
+# fix bad char stuffs
+import string
+
+#cmdline = argparse.ArgumentParser(description = 'Read data from Bamboo and output in a format readable by the SevOne generic Deferred Data reader')
+#cmdline.add_argument('-u', '--url', type = str, default = 'http://bamboo/rest/api', help = 'Base URL to the Bamboo API', required = True)
+
+def usage(): # {{{
+	print 'Usage:'
+	print '    bamboo-rest -u username -p password [options]'
+	print 'Description:'
+	print '    Using its REST API, pulls data from Bamboo about recent tests and'
+	print '       massages it into a format suitable for piping into the SevOne'
+	print '       generic Deferred Data adapter.'
+	print 'Options:'
+	print ' -h, --help           Print this help message'
+	print ' -d, --device=DEV     Use DEV as the SevOne device name; default: bamboo'
+	print ' -a, --address=ADDR   Use ADDR as the Bamboo url; default: http://DEV/'
+	print ' -u, --username=USER  Required; use USER as the username for Bamboo'
+	print ' -p, --password=PASS  Required; use PASS as the password for Bamboo'
+# }}}
+
+# parse command-line arguments {{{
+try:
+	opts, args = getopt.getopt(sys.argv[1:], 'a:u:p:h', ['help', 'address=', 'username=', 'password='])
+except getopt.GetoptError, err:
+	print str(err)
+	usage()
+	sys.exit(2)
+
+deviceName = 'bamboo'
+bambooUrlOverride = False
+bambooUrl = None
+username = None
+password = None
+
+for o, a in opts:
+	if(o == '-d' or o == '--device'):
+		deviceName = a
+	elif(o == '-a' or o == '--address'):
+		bambooUrl = a
+		bambooUrlOverride = True
+	elif(o == '-u' or o == '--username'):
+		username = a
+	elif(o == '-p' or o == '--password'):
+		password = a
+	elif(o == '-h' or o == '--help'):
+		usage()
+		sys.exit()
+
+if(not(username and password)):
+	usage()
+	sys.exit(2)
+
+if(not bambooUrlOverride):
+	bambooUrl = 'http://' + deviceName + '/'
+# }}}
+
+# CLEVERLY NAMED function to retrieve a remote URL
+def curl(url): # {{{
+	url = bambooUrl + 'rest/api' + url + '.json?os_username=' + username + '&os_password=' + password
+	req = urllib2.Request(url)
+	try:
+		handle = urllib2.urlopen(req)
+	except IOError, e:
+		return ''
+	return handle.read()
+# }}}
+
+# Warning: This will loop forever if curl or json.loads() keeps throwing exceptions
+def curlJson(url): # {{{
+	jsonSuccess = False
+	while not jsonSuccess:
+		try:
+			daters = json.loads(curl(url))
+			jsonSuccess = True
+		except:
+			#print 'derped. herping again'
+			jsonSuccess = False
+	return daters
+# }}}
+
+def getItemTimestamp(result): # {{{
+	offset = int(result['buildStartedTime'][-6:].replace(':', ''))
+	offset = timedelta(hours = offset / 100)
+	date = datetime.strptime(result['buildStartedTime'][:-10], '%Y-%m-%dT%H:%M:%S') - offset
+	return str(calendar.timegm(date.timetuple()))
+# }}}
+
+def handleBooleanTestNode(key, details): # {{{
+	output = ''
+	if(details['state'] == 'Failed'):
+		output += 'Success GAUGE Number 0 '
+	else:
+		output += 'Success GAUGE Number 1 '
+	output += 'Duration GAUGE Milliseconds ' + str(details['buildDuration']) + ' '
+	return output
+# }}}
+
+def handleGranularTestNode(key, details): # {{{
+	output = handleBooleanTestNode(key, details)
+
+	output += '"Successful tests" GAUGE Number ' + str(details['successfulTestCount']) + ' '
+	output += '"Failed tests" GAUGE Number ' + str(details['failedTestCount']) + ' '
+	output += '"Quarantined tests" GAUGE Number ' + str(details['quarantinedTestCount']) + ' '
+	output += '"Total tests" GAUGE Number ' + str(int(details['successfulTestCount']) + int(details['failedTestCount']) + int(details['quarantinedTestCount'])) + ' '
+	
+	return output
+# }}}
+
+def handleFeed(key): # {{{
+	results = curlJson('/latest/result/' + key)
+	results = results['results']['result']
+	for result in results:
+		jsonSuccess = False
+		details = curlJson('/latest/result/' + result['key'])
+		# start the output line with the timestamp and object name
+		outputStr = getItemTimestamp(details) + ' "' + key + '" '
+		if(details['buildTestSummary'] == 'No tests found'):
+			outputStr += '"Bamboo Boolean Test" ' + handleBooleanTestNode(key, details)
+		else:
+			outputStr += '"Bamboo Granular Test" ' + handleGranularTestNode(key, details)
+		print outputStr
+# }}}
+
+plans = curlJson('/latest/plan')
+for plan in plans['plans']['plan']:
+	handleFeed(plan['key'])
