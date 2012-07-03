@@ -1,0 +1,90 @@
+#!/usr/bin/php
+<?php
+// Accepts, via STDIN or a file, a CSV containing fuel fill information - in
+// the following format:
+//    Time, name of station, octane rating ((RON + MON) / 2), price per gallon, volume in gallons, total price, distance travelled in miles
+// Notes:
+//    * Time will be converted to a timestamp using strftime().  It's magic.
+//        Don't worry about how it works.
+//    ** This was tested in the following format: "Y-m-d H:i:s Z"
+//    * Each gas station you use will be a separate object, in addition to an
+//        object that contains data points for all the others.  This is mainly
+//        intended for comparing fuel quality from one brand to the next.  In
+//        the distant future (the year 2000), there will be a command-line
+//        switch to disable the separate stations in order to save elements on
+//        the SevOne appliance it's being imported to
+//    * Any numeric fields that are found to contain a non-numeric value will
+//        have a NULL inserted for that indicator at that data point
+
+$file = STDIN;
+if($argc > 1 && $argv[1] != '-') {
+	$file = $argv[1];
+}
+
+$f = fopen($file, 'r');
+while($line = fgetcsv($f)) {
+	if(count($line) != 7) {
+		continue;
+	}
+
+	$time = strtotime($line[0]);
+
+	$indicators = array( // {{{
+		'Octane rating ((R+N)/2)' => array(
+			'format' => 'GAUGE',
+			'units' => 'Number',
+			'value' => $line[2]
+		),
+		'Price per gallon' => array(
+			'format' => 'GAUGE',
+			'units' => 'Dollars',
+			'value' => $line[3]
+		),
+		'Volume' => array(
+			'format' => 'GAUGE',
+			'units' => 'Gallons',
+			'value' => $line[4]
+		),
+		'Total price (actual)' => array(
+			'format' => 'GAUGE',
+			'units' => 'Dollars',
+			'value' => $line[5]
+		),
+		'Distance travelled' => array(
+			'format' => 'GAUGE',
+			'units' => 'Miles',
+			'value' => $line[6]
+		),
+		'Total price (calculated)' => array(
+			'format' => 'GAUGE',
+			'units' => 'Dollars',
+			'value' => $line[3] * $line[4]
+		),
+		'Total price discrepancy (measured - actual)' => array(
+			'format' => 'GAUGE',
+			'units' => 'Dollars',
+			'value' => $line[5] - ($line[3] * $line[4])
+		),
+		'Distance per volume' => array(
+			'format' => 'GAUGE',
+			'units' => 'Miles per gallon',
+			'value' => $line[6] / $line[4]
+		)
+	/* }}} */ );
+
+	echo $time, ' "Fuel fill: ', str_replace('"', '', $line[1]), '" "Fuel fill" ';
+	foreach($indicators as $name => $ind) {
+		if(!is_numeric($ind['value'])) {
+			unset($indicators[$name]);
+			continue;
+		}
+		echo '"', str_replace('"', '', $name), '" "', str_replace('"', '', $ind['format']), '" "', str_replace('"', '', $ind['units']), '" "', $ind['value'], '" ';
+	}
+	echo PHP_EOL;
+	echo $time, ' "Fuel fill: All Stations" "Fuel fill" ';
+	foreach($indicators as $name => $ind) {
+		echo '"', str_replace('"', '', $name), '" "', str_replace('"', '', $ind['format']), '" "', str_replace('"', '', $ind['units']), '" "', $ind['value'], '" ';
+	}
+	echo PHP_EOL;
+}
+

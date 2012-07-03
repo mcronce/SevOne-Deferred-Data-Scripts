@@ -1,0 +1,278 @@
+#!/usr/bin/php
+<?php
+/**
+	Program to upload data to SevOne using the Deferred Data API
+	Based on DK's script, located at https://gist.github.com/3004669
+
+	@author MC (mc@sevone.com)
+	@version 0.2
+	@since 27-June-2012
+*/
+
+//! The Appliance IP
+$soapIp = '127.0.0.1';
+
+//! The username and password
+$username = '<username>';
+$password = '<password>';
+
+//! The Device to add the objects to
+$deviceName = 'myrouter';
+
+if($argc != 5) {
+	usage();
+	exit;
+}
+
+$soapIp = $argv[1];
+$username = $argv[2];
+$password = $argv[3];
+$deviceName = $argv[4];
+
+//! This is the WSDL url.
+$soapUrl = 'http://' . $soapIp . '/soap3/api.wsdl';
+
+//! Connect to the SOAP server.
+$client = new SoapClient($soapUrl, array('cache_wsdl' => WSDL_CACHE_NONE));
+if( !$client ) {
+	echo '!!! Could not connect to SOAP server at "', $soapUrl, '".', PHP_EOL;
+	exit( 1 );
+}
+//$client->__setLocation('http://' . $soapIp . '/soap3/api.php');
+
+echo '== Information ==', PHP_EOL;
+echo 'IP: ', $soapIp, PHP_EOL;
+echo 'URL: ', $soapUrl, PHP_EOL;
+echo 'Username: ', $username, PHP_EOL;
+echo 'Password: ', $password, PHP_EOL;
+echo 'Device name: ', $deviceName, PHP_EOL;
+
+echo '== Authentication ==', PHP_EOL;
+try {
+	//! This authenticates a user for the duration of this script.
+	$result = $client->authenticate($username, $password);
+	if( !$result ) {
+		echo "!!! Could not authenticate with the server.\n";
+		exit( 1 );
+	}
+} catch( Exception $e ) {
+	echo "Exception:\n";
+	print_r( $e );
+	exit( 1 );
+}
+
+//! Get the device
+try {
+	if(!$device = $client->core_getDeviceByName($deviceName)) {
+		echo '!!! Could not find host device.', PHP_EOL;
+		exit( 1 );
+	}
+} catch(Exception $e) {
+	echo '!!! Could not find host device: Exception:', PHP_EOL;
+	print_r($e);
+	exit(1);
+}
+
+define('SO_PARSE_MODE_NORM', 0);
+define('SO_PARSE_MODE_INQUOTE_SINGLE', 1);
+define('SO_PARSE_MODE_INQUOTE_DOUBLE', 2);
+function split_data_line($line) { // {{{
+	// We are expecting:
+	//    "timestamp" "object name" "object type" ["indicator name 1" "indicator format 1" "indicator units 1" "indicator value 1" ["indicator name 2" "indicator format 2" "indicator units 2" "indicator value 2" [... etc]]]
+	//$parts = preg_split('/(\s+|\'|")/', $line, -1, PREG_SPLIT_DELIM_CAPTURE);
+	$parts = preg_split('/(\s+)/', $line, -1, PREG_SPLIT_DELIM_CAPTURE);
+	$items = array();
+	$mode = SO_PARSE_MODE_NORM;
+	$currentItem = '';
+	foreach($parts as $part) {
+		switch($mode) {
+			case SO_PARSE_MODE_NORM:
+				if(preg_match('/^\s+$/', $part)) {
+					if(substr($currentItem, -1) == "\\" && substr($currentItem, -2, 1) != "\\") {
+						$currentItem = substr($currentItem, 0, -1);
+					} else {
+						$items[] = $currentItem;
+						$currentItem = '';
+						continue;
+					}
+				} else {
+					$startChar = substr($part, 0, 1);
+					if($startChar == '"') {
+						$part = substr($part, 1);
+						$endChar1 = substr($part, -2, 1);
+						$endChar2 = substr($part, -1);
+						if($endChar2 == '"' && $endChar1 != "\\") {
+							$part = substr($part, 0, -1);
+						} else {
+							$mode = SO_PARSE_MODE_INQUOTE_DOUBLE;
+						}
+					} elseif($startChar == '\'') {
+						$part = substr($part, 1);
+						$endChar1 = substr($part, -2, 1);
+						$endChar2 = substr($part, -1);
+						if($endChar2 == '\'' && $endChar1 != "\\") {
+							$part = substr($part, 0, -1);
+						} else {
+							$mode = SO_PARSE_MODE_INQUOTE_SINGLE;
+						}
+					}
+				}
+				$currentItem .= $part;
+				break;
+			case SO_PARSE_MODE_INQUOTE_SINGLE:
+				$endChar1 = substr($part, -2, 1);
+				$endChar2 = substr($part, -1);
+				if($endChar2 == '\'' && $endChar1 != "\\") {
+					$part = substr($part, 0, -1);
+					$mode = SO_PARSE_MODE_NORM;
+				}
+				$currentItem .= $part;
+				break;
+			case SO_PARSE_MODE_INQUOTE_DOUBLE:
+				$endChar1 = substr($part, -2, 1);
+				$endChar2 = substr($part, -1);
+				if($endChar2 == '"' && $endChar1 != "\\") {
+					$part = substr($part, 0, -1);
+					$mode = SO_PARSE_MODE_NORM;
+				}
+				$currentItem .= $part;
+				break;
+		}
+	}
+	return $items;
+/* }}} */ }
+
+function parse_data_line($line) { // {{{
+	$items = split_data_line($line);
+	$output = array(
+		'time' => $items[0],
+		'object_name' => $items[1],
+		'object_type' => $items[2],
+		'indicators' => array()
+	);
+	if(!is_numeric($output['time'])) {
+		$output['time'] = strtotime($output['time']);
+	}
+	for($i = 3; $i + 3 < count($items); $i += 4) {
+		$output['indicators'][] = array(
+			'name' => $items[$i],
+			'type' => $items[$i + 1],
+			'units' => $items[$i + 2],
+			'value' => $items[$i + 3]
+		);
+	}
+	return $output;
+/* }}} */ }
+
+/**
+	Report Statistics to the Server
+
+	This function will lookup and create the object type and indicator types necessary to submit data to the server
+	It will also handle flagging a device for discovery if a new object needs to be created.
+	This assumes the $client variable exists and it a valid SevOne API client
+
+	@param string[$device] The name of the device to associate this data with
+	@param int[$time] The timestamp to associate with the data
+	@param string[$objectType] The object type
+	@param string[$object] The name of the object
+	@param array[$indicators] An array of indicators. having this structure
+	array(
+		"name" => "<indicator name>",
+		"value" => "<indicator value>",
+		// The following are optional
+		"type" => "<indicator type>",
+		"maxValue" => "<indicator Max Value>",
+		"units" => "<Units for this indicator>"
+	)
+
+	@return None
+*/
+function report_stats($deviceId, $time, $objectType, $object, $indicators) {
+	global $client;
+
+	//! Find the object type  (create if necessary)
+	$ot = $client->plugin_deferred_getObjectTypeByOsIdAndName(0, $objectType);
+	if(!$ot) {
+		$otid = $client->plugin_deferred_createObjectType(0, $objectType);
+		$ot = $client->plugin_deferred_getObjectTypeById($otid);
+	}
+	if(!$ot) {
+		throw new Exception("Error creating new object type\n");
+	} elseif(isset($otid)) {
+		echo '--- Created new Object Type, called "', $objectType, '", with ID ', $otid, PHP_EOL;
+	}
+
+	//! Find the Indicator Types (create if necessary)
+	$indicatorTypes = array();
+	$itypes = $client->plugin_deferred_getIndicatorTypesByObjectTypeId($ot->id);
+	foreach($itypes as $indicator) {
+		$indicatorTypes[$indicator->name] = $indicator;
+	}
+	foreach($indicators as $indicator) {
+		if(!array_key_exists($indicator["name"], $indicatorTypes)){
+			$id = $client->plugin_deferred_createIndicatorType($ot->id, $indicator['name']);
+			echo '--- Created new Indicator Type, called "', $indicator['name'], '", with ID ', $id, ', on Object Type ', $ot->id, PHP_EOL;
+			if(array_key_exists("type", $indicator)) {
+				$client->plugin_deferred_setIndicatorTypeFormat($id, $indicator['type']);
+			}
+			if(array_key_exists("units", $indicator)) {
+				$client->plugin_deferred_setIndicatorTypeUnits($id, $indicator["units"]);
+			}
+			if(array_key_exists("maxValue",$indicator)) {
+				$client->plugin_deferred_setIndicatorTypeHasMaxValue($id, 1);
+			}
+			$indicatorTypes[$indicator["name"]] = $client->plugin_deferred_getIndicatorTypeByObjectTypeIdAndName($ot->id,$indicator["name"]);
+		}
+	}
+
+	//! Get the object
+	$obj = $client->plugin_deferred_getObject($deviceId,$object);
+	if(!(array)$obj) {
+		$objId = $client->plugin_deferred_createObject($deviceId,$ot->id,$object);
+		echo '--- Created new Object, called "', $object, '", with ID ', $objId, ' and Object Type ', $ot->id, PHP_EOL;
+		$client->plugin_deferred_setObjectIsEnabled($deviceId, $objId, 1);
+		$client->plugin_deferred_setObjectIsHidden($deviceId, $objId, 0);
+		//! If this object doesn't exist we need discovery to make it
+		$client->core_rediscoverDevice($deviceId);
+		return;
+	}
+
+	//! Find the indicators (Create if necessary)
+	$inds = array();
+	$itypes = $client->plugin_deferred_getIndicatorsByObject($deviceId, $obj->name);
+	foreach($itypes as $indicator) {
+		$inds[$indicator->indicatorType] = $indicator;
+	}
+
+	//! Submit the indicators
+	$data = array();
+	foreach($indicators as $indicator) {
+		if(array_key_exists($indicator["name"], $inds)){
+			$data[$inds[$indicator["name"]]->id] = $indicator["value"];
+			if(array_key_exists("maxValue", $indicator)) {
+				$client->plugin_deferred_setIndicatorOverrideMaxValue($deviceId,$inds[$indicator["name"]]->id,1,$indicator["maxValue"]);
+			}
+		}
+	}
+
+	if(count($data) > 0) {
+		echo '--- Inserting data row for Object "', $object, '" (ID# ', $obj->id, ') at ', $time, ' (', date('Y-m-d H:i:s', $time), ')', PHP_EOL;
+		$client->plugin_deferred_insertDataRows($deviceId, array_keys($data), array($time), array($time => array_values($data)));
+	}
+}
+
+//read in the lines from the script
+$in = fopen('php://stdin', 'r');
+while($line = fgets($in)) {
+	$parseyBits = parse_data_line($line);
+
+	//report the data
+	try {
+		report_stats($device->id, $parseyBits['time'], $parseyBits['object_type'], $parseyBits['object_name'], $parseyBits['indicators']);
+	} catch(Exception $e) {
+		echo 'Exception:', PHP_EOL;
+		print_r($e);
+		exit(1);
+	}
+}
+
