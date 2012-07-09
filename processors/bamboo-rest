@@ -125,10 +125,11 @@ def handleGranularTestNode(key, details): # {{{
 	return output
 # }}}
 
+runNumberRegex = re.compile('-[0-9]+$')
 def outputRun(key): # {{{
 	details = curlJson('/latest/result/' + key)
 	# start the output line with the timestamp and object name
-	outputStr = getItemTimestamp(details) + ' "' + key + '" '
+	outputStr = getItemTimestamp(details) + ' "' + re.sub(runNumberRegex, '', key) + '" '
 	if(details['buildTestSummary'] == 'No tests found'):
 		outputStr += '"Bamboo Boolean Test" ' + handleBooleanTestNode(key, details)
 	else:
