@@ -87,13 +87,17 @@ def curl(url): # {{{
 # Warning: This will loop forever if curl or json.loads() keeps throwing exceptions
 def curlJson(url): # {{{
 	jsonSuccess = False
-	while not jsonSuccess:
+	failCount = 0
+	while(failCount < 5 and not jsonSuccess):
 		try:
 			daters = json.loads(curl(url))
 			jsonSuccess = True
 		except:
 			#print 'derped. herping again'
+			failCount = failCount + 1
 			jsonSuccess = False
+	if(failCount >= 5):
+		sys.exit()
 	return daters
 # }}}
 
