@@ -9,6 +9,12 @@
 	@since 27-June-2012
 */
 
+function usage() { // {{{
+	echo 'Usage:', PHP_EOL;
+	echo '   deferred-data-import sevone-hostname-or-ip sevone-username sevone-password sevone-full-device-name', PHP_EOL;
+	echo PHP_EOL;
+/* }}} */ }
+
 //! The Appliance IP
 $soapIp = '127.0.0.1';
 
