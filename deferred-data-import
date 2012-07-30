@@ -245,7 +245,7 @@ function report_stats($deviceId, $time, $objectType, $objectName, $objectDescrip
 		$client->core_rediscoverDevice($deviceId);
 		return;
 	}
-	$client->plugin_deferred_setObjectOverrideDescription($deviceId, $objId, 1, $objectDescription);
+	$client->plugin_deferred_setObjectOverrideDescription($deviceId, $obj->id, 1, $objectDescription);
 
 	//! Find the indicators (Create if necessary)
 	$inds = array();
