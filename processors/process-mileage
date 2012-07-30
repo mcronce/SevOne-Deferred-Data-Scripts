@@ -72,7 +72,7 @@ while($line = fgetcsv($f)) {
 		)
 	/* }}} */ );
 
-	echo $time, ' "Fuel fill: ', str_replace('"', '', $line[1]), '" "Fuel fill" ';
+	echo $time, ' "Fuel fill: ', str_replace('"', '', $line[1]), '" "Fuel fill" "" ';
 	foreach($indicators as $name => $ind) {
 		if(!is_numeric($ind['value'])) {
 			unset($indicators[$name]);
@@ -81,7 +81,7 @@ while($line = fgetcsv($f)) {
 		echo '"', str_replace('"', '', $name), '" "', str_replace('"', '', $ind['format']), '" "', str_replace('"', '', $ind['units']), '" "', $ind['value'], '" ';
 	}
 	echo PHP_EOL;
-	echo $time, ' "Fuel fill: All Stations" "Fuel fill" ';
+	echo $time, ' "Fuel fill: All Stations" "Fuel fill" "" ';
 	foreach($indicators as $name => $ind) {
 		echo '"', str_replace('"', '', $name), '" "', str_replace('"', '', $ind['format']), '" "', str_replace('"', '', $ind['units']), '" "', $ind['value'], '" ';
 	}

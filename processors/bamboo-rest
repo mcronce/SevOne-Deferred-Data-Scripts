@@ -135,9 +135,9 @@ def outputRun(key): # {{{
 	# start the output line with the timestamp and object name
 	outputStr = getItemTimestamp(details) + ' "' + re.sub(runNumberRegex, '', key) + '" '
 	if(details['buildTestSummary'] == 'No tests found'):
-		outputStr += '"Bamboo Boolean Test" ' + handleBooleanTestNode(key, details)
+		outputStr += '"Bamboo Boolean Test" "" ' + handleBooleanTestNode(key, details)
 	else:
-		outputStr += '"Bamboo Granular Test" ' + handleGranularTestNode(key, details)
+		outputStr += '"Bamboo Granular Test" "" ' + handleGranularTestNode(key, details)
 	print outputStr
 # }}}
 

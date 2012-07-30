@@ -84,7 +84,7 @@ define('SO_PARSE_MODE_INQUOTE_SINGLE', 1);
 define('SO_PARSE_MODE_INQUOTE_DOUBLE', 2);
 function split_data_line($line) { // {{{
 	// We are expecting:
-	//    "timestamp" "object name" "object type" ["indicator name 1" "indicator format 1" "indicator units 1" "indicator value 1" ["indicator name 2" "indicator format 2" "indicator units 2" "indicator value 2" [... etc]]]
+	//    "timestamp" "object name" "object type" "object description" ["indicator name 1" "indicator format 1" "indicator units 1" "indicator value 1" ["indicator name 2" "indicator format 2" "indicator units 2" "indicator value 2" [... etc]]]
 	//$parts = preg_split('/(\s+|\'|")/', $line, -1, PREG_SPLIT_DELIM_CAPTURE);
 	$parts = preg_split('/(\s+)/', $line, -1, PREG_SPLIT_DELIM_CAPTURE);
 	$items = array();
@@ -154,12 +154,13 @@ function parse_data_line($line) { // {{{
 		'time' => $items[0],
 		'object_name' => $items[1],
 		'object_type' => $items[2],
+		'object_description' => $items[3],
 		'indicators' => array()
 	);
 	if(!is_numeric($output['time'])) {
 		$output['time'] = strtotime($output['time']);
 	}
-	for($i = 3; $i + 3 < count($items); $i += 4) {
+	for($i = 4; $i + 3 < count($items); $i += 4) {
 		$output['indicators'][] = array(
 			'name' => $items[$i],
 			'type' => $items[$i + 1],
@@ -180,7 +181,8 @@ function parse_data_line($line) { // {{{
 	@param string[$device] The name of the device to associate this data with
 	@param int[$time] The timestamp to associate with the data
 	@param string[$objectType] The object type
-	@param string[$object] The name of the object
+	@param string[$objectName] The name of the object
+	@param string[$objectDescription] The name of the object
 	@param array[$indicators] An array of indicators. having this structure
 	array(
 		"name" => "<indicator name>",
@@ -193,7 +195,7 @@ function parse_data_line($line) { // {{{
 
 	@return None
 */
-function report_stats($deviceId, $time, $objectType, $object, $indicators) {
+function report_stats($deviceId, $time, $objectType, $objectName, $objectDescription, $indicators) {
 	global $client;
 
 	//! Find the object type  (create if necessary)
@@ -232,16 +234,18 @@ function report_stats($deviceId, $time, $objectType, $object, $indicators) {
 	}
 
 	//! Get the object
-	$obj = $client->plugin_deferred_getObject($deviceId,$object);
+	$obj = $client->plugin_deferred_getObject($deviceId,$objectName);
 	if(!(array)$obj) {
-		$objId = $client->plugin_deferred_createObject($deviceId,$ot->id,$object);
-		echo '--- Created new Object, called "', $object, '", with ID ', $objId, ' and Object Type ', $ot->id, PHP_EOL;
+		$objId = $client->plugin_deferred_createObject($deviceId,$ot->id,$objectName);
+		echo '--- Created new Object, called "', $objectName, '", with ID ', $objId, ' and Object Type ', $ot->id, PHP_EOL;
+		$client->plugin_deferred_setObjectOverrideDescription($deviceId, $objId, 1, $objectDescription);
 		$client->plugin_deferred_setObjectIsEnabled($deviceId, $objId, 1);
 		$client->plugin_deferred_setObjectIsHidden($deviceId, $objId, 0);
 		//! If this object doesn't exist we need discovery to make it
 		$client->core_rediscoverDevice($deviceId);
 		return;
 	}
+	$client->plugin_deferred_setObjectOverrideDescription($deviceId, $objId, 1, $objectDescription);
 
 	//! Find the indicators (Create if necessary)
 	$inds = array();
@@ -262,7 +266,7 @@ function report_stats($deviceId, $time, $objectType, $object, $indicators) {
 	}
 
 	if(count($data) > 0) {
-		echo '--- Inserting data row for Object "', $object, '" (ID# ', $obj->id, ') at ', $time, ' (', date('Y-m-d H:i:s', $time), ')', PHP_EOL;
+		echo '--- Inserting data row for Object "', $objectName, '" (ID# ', $obj->id, ') at ', $time, ' (', date('Y-m-d H:i:s', $time), ')', PHP_EOL;
 		$client->plugin_deferred_insertDataRows($deviceId, array_keys($data), array($time), array($time => array_values($data)));
 	}
 }
@@ -274,7 +278,7 @@ while($line = fgets($in)) {
 
 	//report the data
 	try {
-		report_stats($device->id, $parseyBits['time'], $parseyBits['object_type'], $parseyBits['object_name'], $parseyBits['indicators']);
+		report_stats($device->id, $parseyBits['time'], $parseyBits['object_type'], $parseyBits['object_name'], $parseyBits['object_description'], $parseyBits['indicators']);
 	} catch(Exception $e) {
 		echo 'Exception:', PHP_EOL;
 		print_r($e);
