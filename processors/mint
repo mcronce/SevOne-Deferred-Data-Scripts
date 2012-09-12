@@ -40,12 +40,6 @@ form.username = username
 form.password = password
 form.submit
 
-# refresh our account values; hopefully we get no failures, and everything refreshes within a minute and a half
-page = agent.get(URI.join hostname, "/overview.event")
-token = JSON.parse(page.search("input#javascript-user")[0].attr("value"))['token']
-agent.post(URI.join(hostname, "/refreshFILogins.xevent"), "token" => token)
-sleep(90)
-
 # store the current time
 now = Time.now.to_i.to_s
 
@@ -196,4 +190,9 @@ budgetTags.each do |budgetTag|
 	print "\n"
 end
 #puts budgets
+
+# refresh our account values; hopefully we get no failures, and everything refreshes within a minute and a half
+page = agent.get(URI.join hostname, "/overview.event")
+token = JSON.parse(page.search("input#javascript-user")[0].attr("value"))['token']
+agent.post(URI.join(hostname, "/refreshFILogins.xevent"), "token" => token)
 
