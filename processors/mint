@@ -1,0 +1,178 @@
+#!/usr/bin/ruby
+# encoding: utf-8
+
+# This script was sourced from toddmazierski on github in August, 2012:
+#    https://github.com/toddmazierski/mint-exporter
+# All credit for the login bits goes to him.
+
+require "uri"
+require "rubygems"
+require "bundler/setup"
+require "htmlentities"
+Bundler.require
+
+hostname = "https://wwws.mint.com/"
+
+# parse our arguments
+unless ARGV.length == 2
+	puts "Usage: ruby #{$0} USERNAME PASSWORD"
+	exit 1
+end
+username = ARGV[0]
+password = ARGV[1]
+
+# initialize our HTML decoder
+html = HTMLEntities.new
+
+# spin up the browser emulator
+agent = Mechanize.new
+agent.pluggable_parser.default = Mechanize::Download
+
+# pull down the login page and locate the login form
+page = agent.get(URI.join hostname, "/login.event")
+form = page.form_with(:id => "form-login")
+
+# fill out the login form and send it off
+form.username = username
+form.password = password
+form.submit
+
+# store the current time
+now = Time.now.to_i.to_s
+
+# pull down the overview page and locate the sidebar
+page = agent.get(URI.join hostname, "/overview.event")
+accountTypeTags = page.search("html > body > div#background-gradient > div#wrapper > div#body-container > div#main > div#column-left > div#module-accounts > div.module-content > ul > li.moduleAccount")
+
+# scrape the sidebar into an array of hashes
+accountTypes = []
+accountTypeTags.each do |accountTypeTag|
+	# convert the tag to a string and extract the header information
+	accountType = accountTypeTag.search("h3").to_s
+	typeName = accountType.sub(%r:\s*<h3>\s*<span[^>]*>[^<]+</span>([^<]+)</h3>\s*:, "\\1")
+	typeValue = accountType.sub(%r:\s*<h3>\s*<span[^>]*>([^<]+)</span>[^<]+</h3>\s*:, "\\1").gsub(/[$,]/, "").sub("–", "-")
+
+	# append this type onto our array of types
+	accountType = Hash[:name => typeName, :value => typeValue, :accounts => []]
+
+	# extract the individual accounts in that section
+	accountTypeTag.search("li.account").each do |accountTag|
+		# blow away newlines; they make our regexes cry
+		accountString = accountTag.to_s.gsub("\n", "")
+
+		# scrape out the stuff we care about
+		accountId = accountString.sub(/^\s*<li\s*class="[^"]*account[^"]*"\s*id="\s*account-([0-9]+)">.*$/, "\\1")
+		accountName = accountTag.search("h4 > a.accountName").to_s.sub(/^\s*<a\s*class="[^"]*accountName[^"]*"\s*href="[^"]*">([^<]+).*$/, "\\1")
+		accountValue = accountTag.search("h4 > span.balance").to_s.sub(/^\s*<span\s*class="\s*balance\s*">([^<]+).*$/, "\\1").gsub(/[$,]/, "").sub("–", "-")
+		accountNickname = accountTag.search("h6 > span.nickname").to_s.sub(/^\s*<span\s*class="\s*nickname\s*"\s*>([^<]+).*$/, "\\1")
+
+		# roll up our current account into a hash, for the time being
+		account = Hash[:id => accountId, :name => html.decode(accountName), :nickname => html.decode(accountNickname), :value => accountValue, :type => ""]
+
+		# pull down the transactions page for that account, it has more details
+		txnPage = agent.get(URI.join hostname, "/transaction.event?accountId=" + accountId)
+		txnPage = txnPage.search("html > body > div#background-gradient > div#wrapper > div#body-container > div#main > div#column-transactions")
+
+		# scrape the names from here too; any that are longer than the ones we already have should be authoritative and replace the old
+		nameSection = txnPage.search("div#account-table > div#account-header-bank")
+		accountName = nameSection.search("h1#fi-name-bank")[0].attr("title").strip
+		accountNickname = nameSection.search("h2#account-name-bank")[0].attr("title").strip
+		account[:name] = html.decode(accountName)
+		account[:nickname] = html.decode(accountNickname)
+
+		# now, pull some more account meta-information
+		metaTable = txnPage.search("div#account-table > div#account-summary > table.account > tbody")[0]
+		if metaTable == nil
+			accountCategory = "other"
+		else
+			accountCategory = metaTable.attr("id").sub("account-table-", "").strip
+			metaCells = metaTable.search("tr > td.money")
+		end
+		#puts "--------------"
+		#puts accountCategory
+		#puts URI.join hostname, "/transaction.event?accountId=" + accountId
+
+		if not ["bank", "credit", "loan", "investment", "other"].include?(accountCategory)
+			accountCategory = "!other"
+		end
+
+		# Output the object information
+		print now, ' "Account: ', account[:nickname], '" "Mint Account: ', accountCategory.capitalize, '" "', account[:name], '"'
+		# And the type-agnostic value
+		print ' "Value" GAUGE Number ', account[:value]
+		# using the account type we scraped out of the ID field for that <tbody> tag, we can categorize the account
+		if accountCategory == "bank"
+			availableCash = metaCells[1].content.gsub(/[$,]/, "").sub("–", "-").strip.to_f
+			apy = metaCells[2].content.gsub(/%/, "").sub("–", "-").strip.to_f
+			fees = metaCells[3].content.gsub(/[$,]/, "").sub("–", "-").strip.to_f
+			account[:meta] = Hash[:availableCash => availableCash, :apy => apy, :fees => fees]
+			print ' "Available Cash" GAUGE Number ', availableCash, ' "APY" GAUGE Number ', apy, ' "Total Fees" GAUGE Number ', fees
+		elsif accountCategory == "credit"
+			availableCredit = metaCells[1].content.gsub(/[$,]/, "").sub("–", "-").strip.to_f
+			totalCredit = metaCells[2].content.gsub(/[$,]/, "").sub("–", "-").strip.to_f
+			apr = metaCells[3].content.gsub(/%/, "").sub("–", "-").strip.to_f
+			fees = metaCells[4].content.gsub(/[$,]/, "").sub("–", "-").strip.to_f
+			account[:meta] = Hash[:availableCredit => availableCredit, :totalCredit => totalCredit, :apr => apr, :fees => fees]
+			print ' "Available Credit" GAUGE Number ', availableCredit, ' "Total Credit" GAUGE Number ', totalCredit, ' "APR" GAUGE Number ', apr, ' "Total Fees" GAUGE Number ', fees
+		elsif accountCategory == "loan"
+			nextPayment = metaCells[1].content.gsub(/[$,]/, "").sub("–", "-").strip
+			account[:meta] = Hash[:nextPayment => nextPayment]
+			print ' "Next Payment" GAUGE Number ', nextPayment
+		elsif accountCategory == "investment"
+			fees = metaCells[2].child.content.gsub(/[$,]/, "").sub("–", "-").strip
+			account[:meta] = Hash[:fees => fees]
+			
+			# special handling for investment accounts, need to pull down the investment performance page so we can scrape that daters
+			# TODO: Make this work.  It requires breaking the encryption on some files.
+			#investmentPage = agent.get(URI.join(hostname, "/investment.event?accountId=" + accountId))
+			#investmentPage = investmentPage.search("html > body > div#background-gradient > div#wrapper > div#body-container > div#main > div#column-content > div#account-content > div#portfolio-view > table.portfolio > tbody#portfolio-entries")[0]
+			#puts investmentPage
+			print ' "Total Fees" GAUGE Number ', fees
+		elsif accountCategory == "other" or accountCategory == "!other"
+			account[:meta] = Hash[]
+		end
+		account[:type] = accountCategory
+		print "\n"
+		#puts account
+
+		# append the account onto the accounts array, in our current account type
+		accountType[:accounts] << account
+	end
+	# append the account type onto our account types array
+	accountTypes << accountType
+end
+#puts accountTypes
+
+# pull down the budgets page and locate the spending section
+page = agent.get(URI.join hostname, "/planning.event")
+budgetTags = page.search("html > body > div#background-gradient > div#wrapper > div#body-container > div#main > div#spendingBudget-list > ul#spendingBudget-list-body > li")
+
+# scrape the daters into an array of stuffs
+budgets = []
+budgetTags.each do |budgetTag|
+	# convert the tag to a string and extract the ID
+	budgetId = budgetTag.to_s.gsub("\n", "").sub(/^\s*<li\s*class="[^"]*"\s*id="\s*budget-([0-9]+).*$/, "\\1")
+
+	# find and extract the name
+	budgetName = budgetTag.search("a.title").to_s.gsub("\n", "").sub(%r:\s*<a[^>]*>\s*<span>\s*([^>]+)\s*</span>.*<strong>([^>]+)\s*</strong>.*$:, "\\1: \\2")
+
+	# retrieve the value and budget limit
+	# NOTE: This is the raw HTML; try to view this via Firebug or Chrome's dev
+	#    tools, and the picture will be quite different.  My guess is that 
+	#    they're mangling the page with javascript
+	budgetSpent = budgetTag.search("div.budget-text > span.monthly-budget-text > span.budget-dollar")[1].to_s.gsub("\n", "").sub(%r:\s*<span[^>]*class="[^"]*budget-dollar[^"]*"[^>]*>\s*([0-9]+)\s*</span>.*$:, "\\1")
+	budgetLimit = budgetTag.search("div > div.set-budget-container > div.set-budget > strong.money > span")[1].to_s.gsub("\n", "").sub(%r:\s*<span[^>]*>\s*([0-9]+)\s*</span>.*$:, "\\1")
+
+	# append the budget onto the budgets array
+	budget = Hash[:id => budgetId, :name => html.decode(budgetName), :spent => budgetSpent, :limit => budgetLimit]
+	budgets << budget
+
+	# And output the budget
+	print now, ' "Budget: ', budget[:name], '" "Mint Budget: Spend" "', budget[:name], '"'
+	print ' "Limit" GAUGE Number ', budget[:limit]
+	print ' "Spent" GAUGE Number ', budget[:spent]
+	print ' "Percent Spent" GAUGE Percent ', ((budget[:spent].to_f / budget[:limit].to_f) * 100)
+	print "\n"
+end
+#puts budgets
+
