@@ -97,5 +97,5 @@ installed.  Once you do:
 After that, the mint processor should work fine.
 
 Known issues:
-* Does not auto-refresh accounts
 * Does not pull down details on individual investments, only whole accounts
+* Auto-refreshes accounts at the end of the script, rather than the beginning
