@@ -44,9 +44,21 @@ now = Time.now.to_i.to_s
 
 # pull down the overview page and locate the sidebar
 page = agent.get(URI.join hostname, "/overview.event")
-accountTypeTags = page.search("html > body > div#background-gradient > div#wrapper > div#body-container > div#main > div#column-left > div#module-accounts > div.module-content > ul > li.moduleAccount")
+sidebar = page.search("html > body > div#background-gradient > div#wrapper > div#body-container > div#main > div#column-left > div#module-accounts > div.module-content")[0]
 
-# scrape the sidebar into an array of hashes
+# extract and output the totals
+totals = sidebar.search("ul.totals")[0]
+totalAssets = html.decode(totals.search("li.asset-total > span.balance")[0].content).strip.gsub(/[$,]/, "").sub("–", "-")
+totalDebt = html.decode(totals.search("li.debt-total > span.balance")[0].content).strip.gsub(/[$,]/, "").sub("–", "")
+totalWorth = html.decode(totals.search("li.net-worth > span.balance")[0].content).strip.gsub(/[$,]/, "").sub("–", "-")
+print now, ' "Totals" "Mint Totals" "Totals"'
+print ' "Assets" GAUGE Number ', totalAssets
+print ' "Debt" GAUGE Number ', totalDebt
+print ' "Net Worth" GAUGE Number ', totalWorth
+print "\n"
+
+# scrape the sidebar's account type sections into an array of hashes
+accountTypeTags = sidebar.search("ul > li.moduleAccount")
 accountTypes = []
 accountTypeTags.each do |accountTypeTag|
 	# convert the tag to a string and extract the header information
