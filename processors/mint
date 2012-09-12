@@ -129,6 +129,11 @@ accountTypeTags.each do |accountTypeTag|
 			fees = metaCells[4].content.gsub(/[$,]/, "").sub("–", "-").strip.to_f
 			account[:meta] = Hash[:availableCredit => availableCredit, :totalCredit => totalCredit, :apr => apr, :fees => fees]
 			print ' "Available Credit" GAUGE Number ', availableCredit, ' "Total Credit" GAUGE Number ', totalCredit, ' "APR" GAUGE Number ', apr, ' "Total Fees" GAUGE Number ', fees
+			if totalCredit != 0
+				print ' "Percent Full" GAUGE Percent ', (100 - ((availableCredit / totalCredit) * 100))
+			else
+				print ' "Percent Full" GAUGE Percent 0'
+			end
 		elsif accountCategory == "loan"
 			nextPayment = metaCells[1].content.gsub(/[$,]/, "").sub("–", "-").strip
 			account[:meta] = Hash[:nextPayment => nextPayment]
