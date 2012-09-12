@@ -21,3 +21,24 @@ what you import via Deferred Data will be GAUGE.  Refer to the SevOne manual
 for more information.  It does attempt to use quotes to allow spaces in text
 fields, command-line style, but note that this mechanism is not perfect.
 Non-numeric values will be treated as dropped polls.
+
+
+
+mint
+====
+* Language:  Ruby
+* Type:      Scraper
+* Reference: http://www.mint.com/
+* Usage:
+	mint 'Mint registered E-mail address' 'Mint password'
+
+This one requires special attention.  It is written in Ruby and, as such, has
+special needs.  Before being able to run it, make sure Ruby and bundler
+installed.  Once you do:
+	cd processors/;
+	bundle;
+After that, the mint processor should work fine.
+
+Known issues:
+* Does not auto-refresh accounts
+* Does not pull down details on individual investments, only whole accounts
