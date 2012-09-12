@@ -5,6 +5,8 @@
 #    https://github.com/toddmazierski/mint-exporter
 # All credit for the login bits goes to him.
 
+Dir.chdir(File.dirname($0))
+
 require "uri"
 require "rubygems"
 require "bundler/setup"
