@@ -11,6 +11,7 @@ require "uri"
 require "rubygems"
 require "bundler/setup"
 require "htmlentities"
+require "json"
 Bundler.require
 
 hostname = "https://wwws.mint.com/"
@@ -31,13 +32,19 @@ agent = Mechanize.new
 agent.pluggable_parser.default = Mechanize::Download
 
 # pull down the login page and locate the login form
-page = agent.get(URI.join hostname, "/login.event")
+page = agent.get(URI.join(hostname, "/login.event"))
 form = page.form_with(:id => "form-login")
 
 # fill out the login form and send it off
 form.username = username
 form.password = password
 form.submit
+
+# refresh our account values; hopefully we get no failures, and everything refreshes within a minute and a half
+page = agent.get(URI.join hostname, "/overview.event")
+token = JSON.parse(page.search("input#javascript-user")[0].attr("value"))['token']
+agent.post(URI.join(hostname, "/refreshFILogins.xevent"), "token" => token)
+sleep(90)
 
 # store the current time
 now = Time.now.to_i.to_s
