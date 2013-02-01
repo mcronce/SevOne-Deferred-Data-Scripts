@@ -10,12 +10,15 @@ This is the core script in the collection.  It is agnostic to the data being
 supplied to it; in true Unix style, it simply reads data points from STDIN and
 imports them to a SevOne appliance using the Deferred Data SOAP API mechanism.
 
-Required information is supposed to deferred-data-import via command-line, as
+Required information is supplied to deferred-data-import via command-line, as
 follows:
+
 	deferred-data-import 'SevOne name or IP' 'username' 'password' 'Device Name'
 
 Data input should follow this format:
+
 	"timestamp" "object name" "object type" ["indicator name 1" "indicator format 1" "indicator units 1" "indicator value 1" ["indicator name 2" "indicator format 2" "indicator units 2" "indicator value 2" [... etc]]]
+
 "Indicator format" refers to "GAUGE", "COUNTER32", or "COUNTER64".  Most of
 what you import via Deferred Data will be GAUGE.  Refer to the SevOne manual
 for more information.  It does attempt to use quotes to allow spaces in text
@@ -25,6 +28,7 @@ Non-numeric values will be treated as dropped polls.
 All the processors are executable; provided you have the proper language
 interpreters installed, simply running them with the following syntax should
 get your data imported fine:
+
 	./processors/[processor and args] | ./defererd-data-import [args]
 
 
@@ -35,6 +39,7 @@ bamboo-rest
 * Type:      API
 * Reference: http://www.atlassian.com/software/bamboo
 * Usage:
+
 	bamboo-rest -u username -p password [options]
 
 Provided you have Python and the dependencies installed, this one is easy. I'll
@@ -55,6 +60,7 @@ process-mileage
 * Type:      Local file
 * Refernece: None
 * Usage:
+
 	process-mileage /path/to/csv     # Accepts a filename as a parameter
 	process-mileage < /path/to/csv   # Also accepts data over STDIN
 
@@ -65,7 +71,7 @@ receipts.  It expects CSV files in the following format:
 Special considerations:
 * Time will be converted to a timestamp using strftime().  It's magic.
       Don't worry about how it works.
-** This was tested in the following format: "Y-m-d H:i:s Z"
+* * This was tested in the following format: "Y-m-d H:i:s Z"
 * Each gas station you use will be a separate object, in addition to an
       object that contains data points for all the others.  This is mainly
       intended for comparing fuel quality from one brand to the next.  In
@@ -87,13 +93,16 @@ mint
 * Type:      Screen scraper
 * Reference: http://www.mint.com/
 * Usage:
+
 	mint 'Mint registered E-mail address' 'Mint password'
 
 This one requires special attention.  It is written in Ruby and, as such, has
 special needs.  Before being able to run it, make sure Ruby and bundler
 installed.  Once you do:
+
 	cd processors/;
 	bundle;
+
 After that, the mint processor should work fine.
 
 Known issues:
