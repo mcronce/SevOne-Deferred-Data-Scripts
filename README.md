@@ -40,6 +40,7 @@ bamboo-rest
 * Reference: http://www.atlassian.com/software/bamboo
 * Usage:
 
+
 	bamboo-rest -u username -p password [options]
 
 Provided you have Python and the dependencies installed, this one is easy. I'll
@@ -60,6 +61,7 @@ process-mileage
 * Type:      Local file
 * Refernece: None
 * Usage:
+
 
 	process-mileage /path/to/csv     # Accepts a filename as a parameter
 	process-mileage < /path/to/csv   # Also accepts data over STDIN
@@ -93,6 +95,7 @@ mint
 * Type:      Screen scraper
 * Reference: http://www.mint.com/
 * Usage:
+
 
 	mint 'Mint registered E-mail address' 'Mint password'
 
