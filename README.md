@@ -121,6 +121,8 @@ wordpress
 * Type:      Database processor
 * Reference: http://www.wordpress.org/
 * Usage:
+
+
     wordpress [options] mysql-host 'MySQL user' 'MySQL password' 'MySQL db'
 
 This processor connects to a MySQL database backing a Wordpress instance, does
