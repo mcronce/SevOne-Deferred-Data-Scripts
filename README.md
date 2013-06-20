@@ -111,3 +111,26 @@ After that, the mint processor should work fine.
 Known issues:
 * Does not pull down details on individual investments, only whole accounts
 * Auto-refreshes accounts at the end of the script, rather than the beginning
+
+
+
+wordpress
+=========
+* Language:  Python
+* Type:      Database processor
+* Reference: http://www.wordpress.org/
+* Usage:
+    wordpress [options] mysql-host 'MySQL user' 'MySQL password' 'MySQL db'
+
+This processor connects to a MySQL database backing a Wordpress instance, does
+some processing, and exports some statistics about posts, metadata, comments,
+categories, and tags.
+
+Python dependencies:
+* calendar
+* datetime
+* json
+* MySQLdb
+* optparse
+* time
+
