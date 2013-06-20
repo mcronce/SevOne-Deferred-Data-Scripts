@@ -86,9 +86,9 @@ try {
 define('SO_PARSE_MODE_NORM', 0);
 define('SO_PARSE_MODE_INQUOTE_SINGLE', 1);
 define('SO_PARSE_MODE_INQUOTE_DOUBLE', 2);
+// We are expecting:
+//    "timestamp" "object name" "object type" "object description" ["indicator name 1" "indicator format 1" "indicator units 1" "indicator value 1" ["indicator name 2" "indicator format 2" "indicator units 2" "indicator value 2" [... etc]]]
 function split_data_line($line) { // {{{
-	// We are expecting:
-	//    "timestamp" "object name" "object type" "object description" ["indicator name 1" "indicator format 1" "indicator units 1" "indicator value 1" ["indicator name 2" "indicator format 2" "indicator units 2" "indicator value 2" [... etc]]]
 	//$parts = preg_split('/(\s+|\'|")/', $line, -1, PREG_SPLIT_DELIM_CAPTURE);
 	$parts = preg_split('/(\s+)/', $line, -1, PREG_SPLIT_DELIM_CAPTURE);
 	$items = array();
