@@ -1,0 +1,153 @@
+#!/usr/bin/python2
+import calendar
+import json
+import re
+import sys
+import time
+import MySQLdb as mysql
+from datetime import datetime
+from optparse import OptionParser
+
+# fix bad char stuffs
+import string
+
+# constants {{{
+WP_STATUSES = ['auto-draft', 'future', 'inherit', 'publish', 'trash']
+WP_TYPES = ['attachment', 'nav_menu_item', 'page', 'post', 'revision']
+# }}}
+
+def get_timestamp(): # {{{
+	return str(int(time.mktime(datetime.utcnow().timetuple())))
+# }}}
+
+def wp_table(name): # {{{
+	global options
+	return options.table_prefix + name
+# }}}
+
+# parse command-line arguments {{{
+cmdline = OptionParser(usage = 'usage: %prog [options] mysql_host mysql_user mysql_password mysql_database')
+cmdline.add_option('-t', '--table-prefix', action = 'store', dest = 'table_prefix', default = 'wp_', help = 'The prefix for Wordpress tables in this database')
+
+(options, args) = cmdline.parse_args()
+if(len(args) != 4):
+	cmdline.print_help()
+	sys.exit(1)
+
+(mysql_host, mysql_user, mysql_password, mysql_database) = args
+# }}}
+
+dbconn = mysql.connect(mysql_host, mysql_user, mysql_password, mysql_database)
+
+with dbconn:
+	db = dbconn.cursor()
+
+	# general metadata {{{
+	sys.stdout.write(get_timestamp() + ' "Wordpress general metadata" "Wordpress general metadata" "Unspecific metadata for the Wordpress instance"')
+
+	query = 'SELECT UNIX_TIMESTAMP(MAX(post_date_gmt)) - UNIX_TIMESTAMP() FROM ' + wp_table('posts')
+	db.execute(query)
+	(timediff,) = db.fetchone()
+	sys.stdout.write(' "Time to latest post" GAUGE Seconds ' + str(timediff))
+
+	query = 'SELECT COUNT(*) FROM ' + wp_table('users')
+	db.execute(query)
+	(count,) = db.fetchone()
+	sys.stdout.write(' "Total users" GAUGE Number ' + str(count))
+
+	query = 'SELECT COUNT(*) FROM ' + wp_table('posts')
+	db.execute(query)
+	(count,) = db.fetchone()
+	sys.stdout.write(' "Total posts" GAUGE Number ' + str(count))
+
+	query = 'SELECT COUNT(*) FROM ' + wp_table('comments')
+	db.execute(query)
+	(count,) = db.fetchone()
+	sys.stdout.write(' "Total comments" GAUGE Number ' + str(count))
+
+	query = 'SELECT COUNT(*) FROM ' + wp_table('terms') + ' AS terms INNER JOIN ' + wp_table('term_taxonomy') + ' AS tax ON terms.term_id = tax.term_id WHERE tax.taxonomy = %s'
+	db.execute(query, ('category'))
+	(count,) = db.fetchone()
+	sys.stdout.write(' "Total categories" GAUGE Number ' + str(count))
+
+	query = 'SELECT COUNT(*) FROM ' + wp_table('terms') + ' AS terms INNER JOIN ' + wp_table('term_taxonomy') + ' AS tax ON terms.term_id = tax.term_id WHERE tax.taxonomy = %s'
+	db.execute(query, ('post_tag'))
+	(count,) = db.fetchone()
+	sys.stdout.write(' "Total tags" GAUGE Number ' + str(count))
+
+	sys.stdout.write("\n")
+	# }}}
+
+	# post stats by type {{{
+	timestamp = get_timestamp()
+	sys.stdout.write(timestamp + ' "Wordpress post types (top-level)" "Wordpress post types" "Wordpress post statistics, by type"')
+	for post_type in WP_TYPES:
+		query = 'SELECT COUNT(*) FROM ' + wp_table('posts') + ' WHERE post_parent = %s AND post_type = %s'
+		db.execute(query, (0, post_type))
+		(count,) = db.fetchone()
+		sys.stdout.write(' "' + post_type + '" GAUGE Number ' + str(count))
+	sys.stdout.write("\n")
+
+	timestamp = get_timestamp()
+	sys.stdout.write(timestamp + ' "Wordpress post types (all)" "Wordpress post types" "Wordpress post statistics, by type"')
+	for post_type in WP_TYPES:
+		query = 'SELECT COUNT(*) FROM ' + wp_table('posts') + ' WHERE post_type = %s'
+		db.execute(query, (post_type))
+		(count,) = db.fetchone()
+		sys.stdout.write(' "' + post_type + '" GAUGE Number ' + str(count))
+	sys.stdout.write("\n")
+	# }}}
+
+	# post stats by status {{{
+	timestamp = get_timestamp()
+	sys.stdout.write(timestamp + ' "Wordpress post statuses (top-level)" "Wordpress post statuses" "Wordpress post statistics, by status"')
+	for post_status in WP_STATUSES:
+		query = 'SELECT COUNT(*) FROM ' + wp_table('posts') + ' WHERE post_parent = %s AND post_status = %s'
+		db.execute(query, (0, post_status))
+		(count,) = db.fetchone()
+		sys.stdout.write(' "' + post_status + '" GAUGE Number ' + str(count))
+	sys.stdout.write("\n")
+
+	timestamp = get_timestamp()
+	sys.stdout.write(timestamp + ' "Wordpress post statuses (all)" "Wordpress post statuses" "Wordpress post statistics, by status"')
+	for post_status in WP_STATUSES:
+		query = 'SELECT COUNT(*) FROM ' + wp_table('posts') + ' WHERE post_status = %s'
+		db.execute(query, (post_status))
+		(count,) = db.fetchone()
+		sys.stdout.write(' "' + post_status + '" GAUGE Number ' + str(count))
+	sys.stdout.write("\n")
+	# }}}
+
+	# post stats by category {{{
+	query = 'SELECT terms.term_id, terms.name, tax.count FROM ' + wp_table('terms') + ' AS terms INNER JOIN ' + wp_table('term_taxonomy') + ' AS tax ON terms.term_id = tax.term_id WHERE tax.taxonomy = %s'
+	db.execute(query, ('category'))
+	rows = db.fetchall()
+	for (id, name, count) in rows:
+		timestamp = get_timestamp()
+		sys.stdout.write(timestamp + ' \'Wordpress category "' + name.replace('\'', '\\\'').replace('"', '\\\'') + '"\' "Wordpress category" "Wordpress category statistics"')
+		sys.stdout.write(' "Total posts" GAUGE Number ' + str(count))
+
+		query = 'SELECT posts.post_type, COUNT(*) FROM ' + wp_table('terms') + ' AS terms INNER JOIN ' + wp_table('term_taxonomy') + ' AS tax ON terms.term_id = tax.term_id INNER JOIN ' + wp_table('term_relationships') + ' AS rel ON tax.term_taxonomy_id = rel.term_taxonomy_id INNER JOIN ' + wp_table('posts') + ' AS posts ON rel.object_id = posts.ID WHERE terms.term_id = %s GROUP BY posts.post_type'
+		db.execute(query, (id))
+		rows = db.fetchall()
+		counts_by_type = {}
+		for post_type in WP_TYPES:
+			counts_by_type[post_type] = 0
+		for (post_type, count) in rows:
+			counts_by_type[post_type] = count
+		for post_type in counts_by_type.keys():
+			sys.stdout.write(' "Posts with type \'' + post_type + '\'" GAUGE Number ' + str(counts_by_type[post_type]))
+
+		query = 'SELECT posts.post_status, COUNT(*) FROM ' + wp_table('terms') + ' AS terms INNER JOIN ' + wp_table('term_taxonomy') + ' AS tax ON terms.term_id = tax.term_id INNER JOIN ' + wp_table('term_relationships') + ' AS rel ON tax.term_taxonomy_id = rel.term_taxonomy_id INNER JOIN ' + wp_table('posts') + ' AS posts ON rel.object_id = posts.ID WHERE terms.term_id = %s GROUP BY posts.post_status'
+		db.execute(query, (id))
+		rows = db.fetchall()
+		counts_by_status = {}
+		for status in WP_STATUSES:
+			counts_by_status[status] = 0
+		for (status, count) in rows:
+			counts_by_status[status] = count
+		for status in counts_by_status.keys():
+			sys.stdout.write(' "Posts with status \'' + status + '\'" GAUGE Number ' + str(counts_by_status[status]))
+		
+		sys.stdout.write("\n")
+	# }}}
