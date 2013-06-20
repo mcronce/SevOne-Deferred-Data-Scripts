@@ -99,6 +99,7 @@ mint
 
 	mint 'Mint registered E-mail address' 'Mint password'
 
+**** THIS IS CURRENTLY NON-FUNCTIONAL AFTER A RECENT MINT UPDATE ****
 This one requires special attention.  It is written in Ruby and, as such, has
 special needs.  Before being able to run it, make sure Ruby and bundler
 installed.  Once you do:
