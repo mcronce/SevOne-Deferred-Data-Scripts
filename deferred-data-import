@@ -164,7 +164,7 @@ function parse_data_line($line) { // {{{
 	if(!is_numeric($output['time'])) {
 		$output['time'] = @strtotime($output['time']);
 	}
-	for($i = 4; $i + 3 < count($items); $i += 4) {
+	for($i = 4; $i + 2 < count($items); $i += 4) {
 		$output['indicators'][] = array(
 			'name' => $items[$i],
 			'type' => $items[$i + 1],
