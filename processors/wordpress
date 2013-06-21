@@ -17,7 +17,8 @@ WP_TYPES = ['attachment', 'nav_menu_item', 'page', 'post', 'revision']
 # }}}
 
 def get_timestamp(): # {{{
-	return str(int(time.mktime(datetime.utcnow().timetuple())))
+	#return str(int(time.mktime(datetime.utcnow().timetuple())))
+	return str(int(time.mktime(datetime.now().timetuple())))
 # }}}
 
 def wp_table(name): # {{{
