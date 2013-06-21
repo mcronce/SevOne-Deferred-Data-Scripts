@@ -132,7 +132,6 @@ categories, and tags.
 Python dependencies:
 * calendar
 * datetime
-* json
 * MySQLdb
 * optparse
 * time

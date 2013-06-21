@@ -1,6 +1,5 @@
 #!/usr/bin/python2
 import calendar
-import json
 import re
 import sys
 import time
