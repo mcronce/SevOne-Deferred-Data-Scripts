@@ -137,3 +137,26 @@ Python dependencies:
 * optparse
 * time
 
+
+
+alexa
+=====
+* Language:  Python
+* Type:      Screen scraper
+* Reference: http://www.alexa.com/
+* Usage:
+
+
+    alexa domain-name
+
+This processor scrapes the page on alexa.com for the given domain name for
+rank, reach, and other data.
+
+Python dependencies:
+* calendar
+* datetime
+* lxml
+* mechanize
+* optparse
+* time
+

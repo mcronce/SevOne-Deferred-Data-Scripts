@@ -1,0 +1,164 @@
+#!/usr/bin/python2
+import calendar
+import lxml.html
+import mechanize
+import re
+import sys
+import time
+from datetime import datetime
+from optparse import OptionParser
+
+# Constants {{{
+regex_number = re.compile('-?[0-9,.]+')
+# }}}
+
+def get_numbers(string): # {{{
+	numbers = regex_number.findall(string)
+	if(len(numbers) == 0):
+		return ['NULL']
+	
+	for i in xrange(len(numbers)):
+		numbers[i] = numbers[i].replace(',', '')
+	
+	return numbers
+# }}}
+
+def mins_to_secs(numbers): # {{{
+	return str((int(numbers[0]) + (int(numbers[1]) / 60.0)))
+# }}}
+
+# Parse command-line arguments {{{
+cmdline = OptionParser(usage = 'usage: %prog domain-name')
+
+(options, args) = cmdline.parse_args()
+if(len(args) != 1):
+	cmdline.print_help()
+	sys.exit(1)
+
+(domain_name,) = args
+# }}}
+
+# Browser setup {{{
+# Initialize the browser
+br = mechanize.Browser()
+
+# Enable some handlers
+br.set_handle_equiv(True)
+#br.set_handle_gzip(True)
+br.set_handle_redirect(True)
+br.set_handle_referer(True)
+br.set_handle_robots(False)
+
+# Don't hang on >0 refresh times
+br.set_handle_refresh(mechanize._http.HTTPRefreshProcessor(), max_time = 1)
+
+# Lie, cheat, and steal
+br.addheaders = [('User-agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31 AlexaToolbar/alxg-3.1')]
+# }}}
+
+# Throw down our timestamp/object information
+sys.stdout.write(str(int(time.mktime(datetime.now().timetuple()))) + ' "Alexa stats" "Alexa stats" "Alexa web domain name statistics"')
+
+# Retrieve the page, parse into an XML document, and find the root of the stuff we care about
+response = br.open('http://www.alexa.com/siteinfo/' + domain_name)
+page = lxml.html.fromstring(response.read())
+(big_container,) = page.cssselect('html > body > div#pageContainer > div#page > div.page-width > div#threecolwrap')
+
+# Get the stats from the top part of the page
+(table,) = big_container.cssselect('div#siteinfo-site-summary > span > div#site > section#summary-site-stats > table#siteStats > tbody > tr.data-row1')
+datadivs = table.cssselect('td > div.data')
+#(rank,) = get_numbers(datadivs[0].cssselect('a')[0].text)
+(usrank,) = get_numbers(datadivs[1].text_content())
+(reputation,) = get_numbers(datadivs[2].cssselect('a')[0].text)
+#sys.stdout.write(' "Rank (global)" GAUGE Number ' + rank)
+sys.stdout.write(' "US 3-month rank" GAUGE Number ' + usrank)
+sys.stdout.write(' "Reputation" GAUGE Number ' + reputation)
+
+# Find the lower part of the page
+(tabs,) = big_container.cssselect('div.row > div#onecolwrap > section#content > div#content-inner > div#siteinfotabs > div#trafficstats_div > div#tw-tabmodule > div#tw-tabContainers')
+
+# Parse the "traffic stats" tab
+rows = tabs.cssselect('div#rank > table.rank > tr')
+(onemonth,) = get_numbers(rows[1].cssselect('td.avg')[0].text)
+(onemonth_change,) = get_numbers(rows[1].cssselect('td.percent')[0].text)
+(threemonth,) = get_numbers(rows[2].cssselect('td.avg')[0].text)
+(threemonth_change,) = get_numbers(rows[2].cssselect('td.percent')[0].text)
+sys.stdout.write(' "1-month rank" GAUGE Number ' + onemonth)
+sys.stdout.write(' "1-month rank (change)" GAUGE Number ' + onemonth_change)
+sys.stdout.write(' "3-month rank" GAUGE Number ' + threemonth)
+sys.stdout.write(' "3-month rank (change)" GAUGE Number ' + threemonth_change)
+
+# Parse the "reach %" tab
+rows = tabs.cssselect('div#reach > table.visitors_percent > tr')
+(onemonth,) = get_numbers(rows[1].cssselect('td.avg')[0].text)
+(onemonth_change,) = get_numbers(rows[1].cssselect('td.percent')[0].text)
+(threemonth,) = get_numbers(rows[2].cssselect('td.avg')[0].text)
+(threemonth_change,) = get_numbers(rows[2].cssselect('td.percent')[0].text)
+sys.stdout.write(' "1-month reach%" GAUGE Percent ' + onemonth)
+sys.stdout.write(' "1-month reach% (change%)" GAUGE Percent ' + onemonth_change)
+sys.stdout.write(' "3-month reach%" GAUGE Percent ' + threemonth)
+sys.stdout.write(' "3-month reach% (change%)" GAUGE Percent ' + threemonth_change)
+
+# Parse the "pageviews %" tab
+rows = tabs.cssselect('div#pageviews > table.pageviews_percent > tr')
+(onemonth,) = get_numbers(rows[1].cssselect('td.avg')[0].text)
+(onemonth_change,) = get_numbers(rows[1].cssselect('td.percent')[0].text)
+(threemonth,) = get_numbers(rows[2].cssselect('td.avg')[0].text)
+(threemonth_change,) = get_numbers(rows[2].cssselect('td.percent')[0].text)
+sys.stdout.write(' "1-month pageviews%" GAUGE Percent ' + onemonth)
+sys.stdout.write(' "1-month pageviews% (change%)" GAUGE Percent ' + onemonth_change)
+sys.stdout.write(' "3-month pageviews%" GAUGE Percent ' + threemonth)
+sys.stdout.write(' "3-month pageviews% (change%)" GAUGE Percent ' + threemonth_change)
+
+# Parse the "pageviews/user" tab
+rows = tabs.cssselect('div#pageviews_per_user > table.pageviews_per_visitor > tr')
+(onemonth,) = get_numbers(rows[1].cssselect('td.avg')[0].text)
+(onemonth_change,) = get_numbers(rows[1].cssselect('td.percent')[0].text)
+(threemonth,) = get_numbers(rows[2].cssselect('td.avg')[0].text)
+(threemonth_change,) = get_numbers(rows[2].cssselect('td.percent')[0].text)
+sys.stdout.write(' "1-month pageviews per user" GAUGE Number ' + onemonth)
+sys.stdout.write(' "1-month pageviews per user (change%)" GAUGE Percent ' + onemonth_change)
+sys.stdout.write(' "3-month pageviews per user" GAUGE Number ' + threemonth)
+sys.stdout.write(' "3-month pageviews per user (change%)" GAUGE Percent ' + threemonth_change)
+
+# Parse the "bounce %" tab
+rows = tabs.cssselect('div#bounce > table.bounce_percent > tr')
+(onemonth,) = get_numbers(rows[1].cssselect('td.avg')[0].text)
+(onemonth_change,) = get_numbers(rows[1].cssselect('td.percent')[0].text)
+(threemonth,) = get_numbers(rows[2].cssselect('td.avg')[0].text)
+(threemonth_change,) = get_numbers(rows[2].cssselect('td.percent')[0].text)
+sys.stdout.write(' "1-month bounce%" GAUGE Number ' + onemonth)
+sys.stdout.write(' "1-month bounce% (change%)" GAUGE Percent ' + onemonth_change)
+sys.stdout.write(' "3-month bounce%" GAUGE Number ' + threemonth)
+sys.stdout.write(' "3-month bounce% (change%)" GAUGE Percent ' + threemonth_change)
+
+# Parse the "time on site" tab
+rows = tabs.cssselect('div#time_on_site > table.time_on_site_min > tr')
+onemonth = mins_to_secs(get_numbers(rows[1].cssselect('td.avg')[0].text))
+(onemonth_change,) = get_numbers(rows[1].cssselect('td.percent')[0].text)
+threemonth = mins_to_secs(get_numbers(rows[2].cssselect('td.avg')[0].text))
+(threemonth_change,) = get_numbers(rows[2].cssselect('td.percent')[0].text)
+sys.stdout.write(' "1-month time on site" GAUGE Minutes ' + onemonth)
+sys.stdout.write(' "1-month time on site (change%)" GAUGE Percent ' + onemonth_change)
+sys.stdout.write(' "3-month time on site" GAUGE Minutes ' + threemonth)
+sys.stdout.write(' "3-month time on site (change%)" GAUGE Percent ' + threemonth_change)
+
+# Parse the "search %" tab
+rows = tabs.cssselect('div#search > table.search_percent > tr')
+(onemonth,) = get_numbers(rows[1].cssselect('td.avg')[0].text)
+(onemonth_change,) = get_numbers(rows[1].cssselect('td.percent')[0].text)
+(threemonth,) = get_numbers(rows[2].cssselect('td.avg')[0].text)
+(threemonth_change,) = get_numbers(rows[2].cssselect('td.percent')[0].text)
+#if(onemonth != None):
+#	sys.stdout.write(' "1-month search%" GAUGE Number ' + onemonth)
+#if(onemonth_change != None):
+#	sys.stdout.write(' "1-month search% (change%)" GAUGE Percent ' + onemonth_change)
+#if(threemonth != None):
+#	sys.stdout.write(' "3-month search%" GAUGE Number ' + threemonth)
+#if(threemonth_change != None):
+#	sys.stdout.write(' "3-month search% (change%)" GAUGE Percent ' + threemonth_change)
+
+sys.stdout.write(' "1-month search%" GAUGE Number ' + onemonth)
+sys.stdout.write(' "1-month search% (change%)" GAUGE Percent ' + onemonth_change)
+sys.stdout.write(' "3-month search%" GAUGE Number ' + threemonth)
+sys.stdout.write(' "3-month search% (change%)" GAUGE Percent ' + threemonth_change)
