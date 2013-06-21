@@ -44,7 +44,7 @@ if( !$client ) {
 	echo '!!! Could not connect to SOAP server at "', $soapUrl, '".', PHP_EOL;
 	exit( 1 );
 }
-//$client->__setLocation('http://' . $soapIp . '/soap3/api.php');
+$client->__setLocation('http://' . $soapIp . '/soap3/api.php');
 
 echo '== Information ==', PHP_EOL;
 echo 'IP: ', $soapIp, PHP_EOL;
