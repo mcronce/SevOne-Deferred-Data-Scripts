@@ -270,6 +270,12 @@ function report_stats($deviceId, $time, $objectType, $objectName, $objectDescrip
 	}
 
 	if(count($data) > 0) {
+		foreach($data as &$value) {
+			if(!is_numeric($value)) {
+				$value = null;
+			}
+		}
+
 		echo '--- Inserting data row for Object "', $objectName, '" (ID# ', $obj->id, ') at ', $time, ' (', @date('Y-m-d H:i:s', $time), ')', PHP_EOL;
 		$client->plugin_deferred_insertDataRows($deviceId, array_keys($data), array($time), array($time => array_values($data)));
 	}
