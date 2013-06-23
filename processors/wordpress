@@ -45,7 +45,7 @@ with dbconn:
 	# general metadata {{{
 	sys.stdout.write(get_timestamp() + ' "Wordpress general metadata" "Wordpress general metadata" "Unspecific metadata for the Wordpress instance"')
 
-	query = 'SELECT UNIX_TIMESTAMP(MAX(post_date_gmt)) - UNIX_TIMESTAMP() FROM ' + wp_table('posts')
+	query = 'SELECT UNIX_TIMESTAMP(MAX(post_date_gmt)) - UNIX_TIMESTAMP(CONVERT_TZ(NOW(), @@global.time_zone, \'GMT\')) FROM ' + wp_table('posts')
 	db.execute(query)
 	(timediff,) = db.fetchone()
 	sys.stdout.write(' "Time to latest post" GAUGE Hours ' + str(timediff / 3600.0))
