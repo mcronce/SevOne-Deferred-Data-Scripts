@@ -119,7 +119,7 @@ with dbconn:
 	# }}}
 
 	# post stats by category {{{
-	query = 'SELECT terms.term_id, terms.name, tax.count FROM ' + wp_table('terms') + ' AS terms INNER JOIN ' + wp_table('term_taxonomy') + ' AS tax ON terms.term_id = tax.term_id WHERE tax.taxonomy = %s'
+	query = 'SELECT terms.term_id, terms.name, COUNT(*) FROM ' + wp_table('terms') + ' AS terms INNER JOIN ' + wp_table('term_taxonomy') + ' AS tax ON terms.term_id = tax.term_id INNER JOIN ' + wp_table('term_relationships') + ' AS rel ON tax.term_taxonomy_id = rel.term_taxonomy_id INNER JOIN ' + wp_table('posts') + ' AS posts ON rel.object_id = posts.ID WHERE tax.taxonomy = %s GROUP BY terms.term_id'
 	db.execute(query, ('category'))
 	rows = db.fetchall()
 	for (id, name, count) in rows:
