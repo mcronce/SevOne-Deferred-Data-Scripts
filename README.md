@@ -33,6 +33,14 @@ get your data imported fine:
 
 
 
+deferred-data-backfill
+======================
+This works exactly the same way as deferred-data-import, but is optimized for
+backfilling a large volume of historical data by making use of the multi-row
+insert functionality in SevOne's plugin_deferred_insertDataRows() API function.
+
+
+
 bamboo-rest
 ===========
 * Language:  Python
