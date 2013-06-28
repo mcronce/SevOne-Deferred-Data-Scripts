@@ -91,23 +91,13 @@ Known issues:
 
 mint
 ====
-* Language:  Ruby
+* Language:  CasperJS
 * Type:      Screen scraper
 * Reference: http://www.mint.com/
 * Usage:
 
 
 	mint 'Mint registered E-mail address' 'Mint password'
-
-**** THIS IS CURRENTLY NON-FUNCTIONAL AFTER A RECENT MINT UPDATE ****
-This one requires special attention.  It is written in Ruby and, as such, has
-special needs.  Before being able to run it, make sure Ruby and bundler
-installed.  Once you do:
-
-	cd processors/;
-	bundle;
-
-After that, the mint processor should work fine.
 
 Known issues:
 * Does not pull down details on individual investments, only whole accounts

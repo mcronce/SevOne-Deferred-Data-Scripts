@@ -1,203 +1,358 @@
-#!/usr/bin/ruby
-# encoding: utf-8
+#!/usr/bin/casperjs
 
-# This script was sourced from toddmazierski on github in August, 2012:
-#    https://github.com/toddmazierski/mint-exporter
-# All credit for the login bits goes to him.
+var system = require('system');
+var utils = require('utils');
+var fs = require('fs');
 
-Dir.chdir(File.dirname($0))
+// casperjs adds three args to the beginning
+if(system.args.length != 6) {
+	this.echo('usage: mint username password');
+	phantom.exit(1);
+}
 
-require "uri"
-require "rubygems"
-require "bundler/setup"
-require "htmlentities"
-require "json"
-Bundler.require
+String.prototype.toProperCase = function toProperCase() {
+	return this.replace(/\w\S*/g, function _toProperCase(txt) {
+		return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+	});
+};
 
-hostname = "https://wwws.mint.com/"
+var username = system.args[4];
+var password = system.args[5];
 
-# parse our arguments
-unless ARGV.length == 2
-	puts "Usage: ruby #{$0} USERNAME PASSWORD"
-	exit 1
-end
-username = ARGV[0]
-password = ARGV[1]
+var casper = require('casper').create();
+casper.userAgent('Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31');
 
-# initialize our HTML decoder
-html = HTMLEntities.new
+// looks like we need to do this part to force the onLoad javascript to run?...
+function javascriptOnLoad() {
+	//this.echo(this.getHTML());
+	//$(document).on('site:loaded', function() {
+	YAHOO.util.Event.onDOMReady(function() {
+		window.siteLoaded = true;
+	});
+	return true;
+}
 
-# spin up the browser emulator
-agent = Mechanize.new
-agent.pluggable_parser.default = Mechanize::Download
+function javascriptLoadedCheck() {
+	return this.evaluate(function() {
+		return window.siteLoaded === true;
+	}) === true;
+}
 
-# pull down the login page and locate the login form
-page = agent.get(URI.join(hostname, "/login.event"))
-form = page.form_with(:id => "form-login")
+casper.start('https://wwws.mint.com/login.event?task=L', function loadMint() {
+	this.evaluateOrDie(javascriptOnLoad);
+});
 
-# fill out the login form and send it off
-form.username = username
-form.password = password
-form.submit
+// This is some debug code that overrides some of Mint's libraries with local copies.
+/*casper.on('resource.requested', function onResourceRequested(requestData, networkRequest) {
+	if(requestData.url == 'https://wwws.mint.com/sc/ph4474.7/js/library.js') {
+		networkRequest.changeUrl(fs.workingDirectory + '/debug/mint/library.js');
+	} else if(requestData.url == 'https://wwws.mint.com/sc/ph4474.7/js/summary.js') {
+		networkRequest.changeUrl(fs.workingDirecotry + '/debug/mint/summary.js');
+	} else if(requestData.url == 'https://wwws.mint.com/sc/ph4474.7/js/lib/mint_s_code.js') {
+		networkRequest.changeUrl(fs.workingDirecotry + '/debug/mint/s-code.js');
+	}
+});*/
 
-# store the current time
-now = Time.now.to_i.to_s
+// This is some debug code that prints out the URL to every single resource that a page loads.
+/*casper.on('resource.received', function onResourceReceived(resource) {
+	this.echo('--- ' + resource.url);
+});*/
 
-# pull down the overview page and locate the sidebar
-page = agent.get(URI.join hostname, "/overview.event")
-sidebar = page.search("html > body > div#background-gradient > div#wrapper > div#body-container > div#main > div#column-left > div#module-accounts > div.module-content")[0]
+// This is some debug code that prints remote (in-page) log statements to the local console.
+/*casper.on('remote.message', function onRemoteMessage(msg) {
+	this.echo('+++ ' + msg);
+});*/
 
-# extract and output the totals
-totals = sidebar.search("ul.totals")[0]
-totalAssets = html.decode(totals.search("li.asset-total > span.balance")[0].content).strip.gsub(/[$,]/, "").sub("–", "-")
-totalDebt = html.decode(totals.search("li.debt-total > span.balance")[0].content).strip.gsub(/[$,]/, "").sub("–", "")
-totalWorth = html.decode(totals.search("li.net-worth > span.balance")[0].content).strip.gsub(/[$,]/, "").sub("–", "-")
-print now, ' "Totals" "Mint Totals" "Totals"'
-print ' "Assets" GAUGE Number ', totalAssets
-print ' "Debt" GAUGE Number ', totalDebt
-print ' "Net Worth" GAUGE Number ', totalWorth
-print "\n"
+casper.waitFor(javascriptLoadedCheck, undefined, undefined, 15000);
 
-# scrape the sidebar's account type sections into an array of hashes
-accountTypeTags = sidebar.search("ul > li.moduleAccount")
-accountTypes = []
-accountTypeTags.each do |accountTypeTag|
-	# convert the tag to a string and extract the header information
-	accountType = accountTypeTag.search("h3").to_s
-	typeName = accountType.sub(%r:\s*<h3>\s*<span[^>]*>[^<]+</span>([^<]+)</h3>\s*:, "\\1")
-	typeValue = accountType.sub(%r:\s*<h3>\s*<span[^>]*>([^<]+)</span>[^<]+</h3>\s*:, "\\1").gsub(/[$,]/, "").sub("–", "-")
+casper.then(function login() {
+	this.fill('form#form-login', {
+		'username' : username,
+		'password' : password
+	}, true);
+});
 
-	# append this type onto our array of types
-	accountType = Hash[:name => typeName, :value => typeValue, :accounts => []]
+casper.thenEvaluate(javascriptOnLoad);
+casper.waitFor(javascriptLoadedCheck, undefined, undefined, 15000);
+casper.waitForSelector('html > body > div#background-gradient > div#wrapper > div#body-container > div#main > div.page-overview > table', undefined, undefined, 15000);
 
-	# extract the individual accounts in that section
-	accountTypeTag.search("li.account").each do |accountTag|
-		# blow away newlines; they make our regexes cry
-		accountString = accountTag.to_s.gsub("\n", "")
+var account_data;
+var current_timestamp;
+casper.then(function scrapeSidebarData() {
+	current_timestamp = Math.round(new Date().getTime() / 1000);
+	account_data = this.evaluate(function scrapeSidebarData_local() { // {{{
+		var re = {
+			'fix_minus'       : new RegExp('–', 'g'),
+			'dollar2number'   : new RegExp('[$,]', 'g'),
+			'sidebarHeader'   : new RegExp('^.*<a[^>]*>[^<]*</a>\s*<span[^>]*>\s*([^<]+)\s*</span>\s*([^<]+).*$'),
+			'accountId'       : new RegExp('^.*accountId=([0-9]+)\s*$'),
+			'accountCategory' : new RegExp('^moduleAccounts-([a-z]+)$')
+		};
 
-		# scrape out the stuff we care about
-		accountId = accountString.sub(/^\s*<li\s*class="[^"]*account[^"]*"\s*id="\s*account-([0-9]+)">.*$/, "\\1")
-		accountName = accountTag.search("h4 > a.accountName").to_s.sub(/^\s*<a\s*class="[^"]*accountName[^"]*"\s*href="[^"]*">([^<]+).*$/, "\\1")
-		accountValue = accountTag.search("h4 > span.balance").to_s.sub(/^\s*<span\s*class="\s*balance\s*">([^<]+).*$/, "\\1").gsub(/[$,]/, "").sub("–", "-")
-		accountNickname = accountTag.search("h6 > span.nickname").to_s.sub(/^\s*<span\s*class="\s*nickname\s*"\s*>([^<]+).*$/, "\\1")
+		var return_data = {
+			'timestamp'     : null,
+			'totals'        : null,
+			'account_types' : []
+		};
 
-		# roll up our current account into a hash, for the time being
-		account = Hash[:id => accountId, :name => html.decode(accountName), :nickname => html.decode(accountNickname), :value => accountValue, :type => ""]
+		var main = document.querySelector('html > body > div#background-gradient > div#wrapper > div#body-container > div#main > div.page-overview > table > tbody > tr');
+		var sidebar = main.querySelector('td.column-left > div#column-left');
 
-		# pull down the transactions page for that account, it has more details
-		txnPage = agent.get(URI.join hostname, "/transaction.event?accountId=" + accountId)
-		txnPage = txnPage.search("html > body > div#background-gradient > div#wrapper > div#body-container > div#main > div#column-transactions")
+		var accounts = sidebar.querySelector('div#module-accounts > div.module-content');
+		var totals = accounts.querySelector('ul.totals');
+		return_data.totals = {
+			'assets'        : totals.querySelector('li.asset-total > span.balance').innerHTML.replace(re.dollar2number, '').replace(re.fix_minus, '-'),
+			'debt'          : totals.querySelector('li.debt-total > span.balance').innerHTML.replace(re.dollar2number, '').replace(re.fix_minus, '-'),
+			'net_worth'     : totals.querySelector('li.net-worth > span.balance').innerHTML.replace(re.dollar2number, '').replace(re.fix_minus, '-')
+		};
 
-		# scrape the names from here too; any that are longer than the ones we already have should be authoritative and replace the old
-		nameSection = txnPage.search("div#account-table > div#account-header-bank")
-		accountName = nameSection.search("h1#fi-name-bank")[0].attr("title").strip
-		accountNickname = nameSection.search("h2#account-name-bank")[0].attr("title").strip
-		account[:name] = html.decode(accountName)
-		account[:nickname] = html.decode(accountNickname)
+		var accountTypeTags = sidebar.querySelectorAll('ul > li.moduleAccount');
+		for(var i = 0; i < accountTypeTags.length; i++) {
+			var accountTypeTag = accountTypeTags[i];
+			var accountTypeStr = accountTypeTag.querySelector('h3').innerHTML;
+			var accountCategory = accountTypeTag.getAttribute('id').replace(re.accountCategory, '$1')
 
-		# now, pull some more account meta-information
-		metaTable = txnPage.search("div#account-table > div#account-summary > table.account > tbody")[0]
-		if metaTable == nil
-			accountCategory = "other"
-		else
-			accountCategory = metaTable.attr("id").sub("account-table-", "").strip
-			metaCells = metaTable.search("tr > td.money")
-		end
-		#puts "--------------"
-		#puts accountCategory
-		#puts URI.join hostname, "/transaction.event?accountId=" + accountId
+			var account_type = {
+				'name'     : accountTypeStr.replace(re.sidebarHeader, '$2'),
+				'value'    : accountTypeTag.querySelector('span.balance').innerHTML.replace(re.dollar2number, '').replace(re.fix_minus, '-'),
+				'accounts' : []
+			};
 
-		if not ["bank", "credit", "loan", "investment", "other"].include?(accountCategory)
-			accountCategory = "!other"
-		end
+			var accountTags = accountTypeTags[i].querySelectorAll('ul.accounts-list > li.accounts-data-li');
+			for(var j = 0; j < accountTags.length; j++) {
+				var accountTag = accountTags[j];
+				var accountStr = accountTag.innerHTML;
 
-		# Output the object information
-		print now, ' "Account: ', account[:nickname], '" "Mint Account: ', accountCategory.capitalize, '" "', account[:name], '"'
-		# And the type-agnostic value
-		print ' "Value" GAUGE Number ', account[:value]
-		# using the account type we scraped out of the ID field for that <tbody> tag, we can categorize the account
-		if accountCategory == "bank"
-			availableCash = metaCells[1].content.gsub(/[$,]/, "").sub("–", "-").strip.to_f
-			apy = metaCells[2].content.gsub(/%/, "").sub("–", "-").strip.to_f
-			fees = metaCells[3].content.gsub(/[$,]/, "").sub("–", "-").strip.to_f
-			account[:meta] = Hash[:availableCash => availableCash, :apy => apy, :fees => fees]
-			print ' "Available Cash" GAUGE Number ', availableCash, ' "APY" GAUGE Number ', apy, ' "Total Fees" GAUGE Number ', fees
-		elsif accountCategory == "credit"
-			availableCredit = metaCells[1].content.gsub(/[$,]/, "").sub("–", "-").strip.to_f
-			totalCredit = metaCells[2].content.gsub(/[$,]/, "").sub("–", "-").strip.to_f
-			apr = metaCells[3].content.gsub(/%/, "").sub("–", "-").strip.to_f
-			fees = metaCells[4].content.gsub(/[$,]/, "").sub("–", "-").strip.to_f
-			account[:meta] = Hash[:availableCredit => availableCredit, :totalCredit => totalCredit, :apr => apr, :fees => fees]
-			print ' "Available Credit" GAUGE Number ', availableCredit, ' "Total Credit" GAUGE Number ', totalCredit, ' "APR" GAUGE Number ', apr, ' "Total Fees" GAUGE Number ', fees
-			if totalCredit != 0
-				print ' "Percent Full" GAUGE Percent ', (100 - ((availableCredit / totalCredit) * 100))
-			else
-				print ' "Percent Full" GAUGE Percent 0'
-			end
-		elsif accountCategory == "loan"
-			nextPayment = metaCells[1].content.gsub(/[$,]/, "").sub("–", "-").strip
-			account[:meta] = Hash[:nextPayment => nextPayment]
-			print ' "Next Payment" GAUGE Number ', nextPayment
-		elsif accountCategory == "investment"
-			fees = metaCells[2].child.content.gsub(/[$,]/, "").sub("–", "-").strip
-			account[:meta] = Hash[:fees => fees]
+				var id = accountTag.querySelector('h4 > a.accountName').getAttribute('href').replace(re.accountId, '$1');
+				var name = accountTag.querySelector('h4 > a.accountName').innerText;
+
+				if(id == 'javascript://') {
+					id = name;
+				}
+
+				var account = {
+					'id'       : id,
+					'name'     : name,
+					'nickname' : accountTag.querySelector('h6 > span.nickname').innerText,
+					'category' : accountCategory == 'property' ? 'other' : accountCategory,
+					'value'    : accountTag.querySelector('h4 > span.balance').innerText.replace(re.dollar2number, '').replace(re.fix_minus, '-'),
+					'meta'     : []
+					// Not bothering with last updated, at least for now.
+					//'last-updated' : accountTag.querySelector('h6 > span.last-updated').innerText
+				};
+
+				if(account.category == 'other') {
+					var name = account.nickname;
+					account.nickname = account.name;
+					account.name = name;
+				}
+				
+				account_type.accounts.push(account);
+			}
+
+			return_data.account_types.push(account_type);
+		}
+
+		return return_data;
+	/* }}} */});
+	account_data.timestamp = current_timestamp;
+});
+
+function findAccount(id) {
+	for(var i = 0; i < account_data.account_types.length; i++) {
+		var type = account_data.account_types[i];
+		for(var j = 0; j < type.accounts.length; j++) {
+			if(type.accounts[j].id == id) {
+				return [i, j];
+			}
+		}
+	}
+	return null;
+}
+
+var account_meta = {};
+casper.then(function scheduleScrapingTransactionPages() {
+	for(var i = 0; i < account_data.account_types.length; i++) {
+		var type = account_data.account_types[i];
+		for(var j = 0; j < type.accounts.length; j++) {
+			var account = type.accounts[j];
+			if(/^[0-9]+$/.test(account.id)) {
+				casper.thenOpen('https://wwws.mint.com/transaction.event?accountId=' + account.id);
+				casper.waitForSelector('div#account-table > div#account-summary > table.account > tbody', undefined, undefined, 15000);
+				casper.then(function scrapeTransactionPage() {
+					var accountId = this.getCurrentUrl().replace(new RegExp('^.*accountId=([0-9]+).*$'), '$1');
+
+					account_meta[accountId] = this.evaluate(function scrapeTransactionPage_local() { // {{{
+						var re = {
+							'trim'           : new RegExp('^\s*|\s*$', 'g'),
+							'fix_minus'      : new RegExp('–', 'g'),
+							'dollar2number'  : new RegExp('[$,]+', 'g'),
+							'percent2number' : new RegExp('[%]+', 'g'),
+							'account_type'   : new RegExp('^account-table-([a-z]+).*$')
+						};
+
+						var root = document.querySelector('div#account-table');
+
+						var account_metadata = {
+							'name'        : root.querySelector('div.account-header > h1').getAttribute('title'),
+							'nickname'    : root.querySelector('div.account-header > h2').getAttribute('title'),
+							'specifics'   : []
+						}
+
+						var metaTable = root.querySelector('div#account-summary > table.account > tbody');
+						var metaCells = [];
+						var category;
+						if(!metaTable) {
+							category = 'other';
+						} else {
+							category = metaTable.getAttribute('id').replace(re.account_type, '$1');
+							metaCells = metaTable.querySelectorAll('tr > td.money');
+						}
+
+						if(['bank', 'credit', 'loan', 'investment', 'other'].indexOf(category) == -1) {
+							category = '!other';
+						}
+
+						switch(category) {
+							case 'bank':
+								account_metadata.specifics = [
+									{'name' : 'Available Cash', 'value' : metaCells[1].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-')},
+									{'name' : 'APY', 'value' : metaCells[2].innerText.replace(re.trim, '').replace(re.percent2number, '').replace(re.fix_minus, '-')},
+									{'name' : 'Total Fees', 'value' : metaCells[3].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-')}
+								];
+								break;
+							case 'credit':
+								account_metadata.specifics = [
+									{'name' : 'Available Credit', 'value' : metaCells[1].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-')},
+									{'name' : 'Total Credit', 'value' : metaCells[2].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-')},
+									{'name' : 'APR', 'value' : metaCells[3].innerText.replace(re.trim, '').replace(re.percent2number, '').replace(re.fix_minus, '-')},
+									{'name' : 'Total Fees', 'value' : metaCells[4].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-')}
+								];
+								break;
+							case 'loan':
+								account_metadata.specifics = [
+									{'name' : 'Next Payment', 'value' : metaCells[1].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-')}
+								];
+								break;
+							case 'investment':
+								account_metadata.specifics = [
+									{'name' : 'Total Fees', 'value' : metaCells[2].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-')}
+								];
+								break;
+						}
+
+						return account_metadata;
+					/* }}} */});
+				});
+			}
+		}
+	}
+});
+
+var budget_data = [];
+casper.thenOpen('https://wwws.mint.com/planning.event');
+casper.waitForSelector('ul.planning_items#incomeBudget-list-body');
+casper.waitForSelector('ul.planning_items#spendingBudget-list-body');
+casper.then(function scrapeBudgetPage() {
+	budget_data = this.evaluate(function scrapeBudgetPage_local() {
+		var re = {
+			'dollar2number' : new RegExp('[$,]', 'g')
+		};
+
+		var budgetData = {
+			'timestamp' : Math.round(new Date().getTime() / 1000),
+			'budgets'   : []
+		};
+
+		var budgetTags = document.querySelectorAll('ul.planning_items#spendingBudget-list-body > li');
+		for(var i = 0; i < budgetTags.length; i++) {
+			var budgetTag = budgetTags[i];
+			var valueTags = budgetTag.querySelector('div > div.progress').querySelectorAll('strong');
+			var datum = {
+				'name'    : budgetTag.querySelector('a.title').innerText,
+				'type'    : 'Spend',
+				'spent'   : valueTags[0].innerText.replace(re.dollar2number, ''),
+				'limit'   : valueTags[1].innerText.replace(re.dollar2number, ''),
+				'percent' : 0
+			};
+			datum.percent = datum.limit == 0 ? 0 : ((datum.spent / datum.limit) * 100);
+			budgetData.budgets.push(datum);
+		}
+
+		return budgetData;
+	});
+});
+
+// Finally, refresh the accounts.
+casper.thenOpen('https://wwws.mint.com/overview.event');
+casper.waitForSelector('a#module-accounts-update');
+casper.thenClick('a#module-accounts-update');
+//casper.waitForSelector('a#module-edit-trigger');
+//casper.thenClick('a#module-edit-trigger');
+
+casper.run(function printAllData() {
+	// Currently, this doesn't work.  I suspect because of some obscure rule about writing to global variables from function scope in Javascript.
+	// For the time being, the metadata and account data are being correlated inline in the display code.  I hate it.
+
+	// Incorporate account metadata {{{
+	/*var local_account_data = account_data;
+	for(var accountId in account_meta) {
+		var index = findAccount(accountId);
+		var account = local_account_data.account_types[index[0]].accounts[index[1]];
+
+		account.category = account_meta[accountId].category;
+		account.meta = account_meta[accountId].specifics;
+		utils.dump(account);
+		local_account_data.account_types[index[0]].accounts[index[1]] = account;
+		utils.dump(local_account_data.account_types[index[0]].accounts[index[1]]);
+		this.echo('------------');
+	}
+	account_data = local_account_data;
+	utils.dump(account_data);*/
+	// }}}
+
+	// Print account data {{{
+	this.echo(account_data.timestamp + ' "Totals" "Mint Totals" "Totals" "Assets" GAUGE Number ' + account_data.totals.assets + ' "Debt" GAUGE Number ' + account_data.totals.debt + ' "Net Worth" GAUGE Number ' + account_data.totals.net_worth);
+	for(var i = 0; i < account_data.account_types.length; i++) {
+		var account_type = account_data.account_types[i];
+		for(var j = 0; j < account_type.accounts.length; j++) {
+			var account = account_type.accounts[j];
+			var account_string = account_data.timestamp;
+			var meta;
+			if(/^[0-9]+$/.test(account.id)) {
+				meta = account_meta[account.id].specifics;
+			} else {
+				meta = []
+			}
 			
-			# special handling for investment accounts, need to pull down the investment performance page so we can scrape that daters
-			# TODO: Make this work.  It requires breaking the encryption on some files.
-			#investmentPage = agent.get(URI.join(hostname, "/investment.event?accountId=" + accountId))
-			#investmentPage = investmentPage.search("html > body > div#background-gradient > div#wrapper > div#body-container > div#main > div#column-content > div#account-content > div#portfolio-view > table.portfolio > tbody#portfolio-entries")[0]
-			#puts investmentPage
-			print ' "Total Fees" GAUGE Number ', fees
-		elsif accountCategory == "other" or accountCategory == "!other"
-			account[:meta] = Hash[]
-		end
-		account[:type] = accountCategory
-		print "\n"
-		#puts account
+			account_string += ' "Account: ' + account.nickname + '" "Mint Account: ' + account.category.toProperCase() + '" "' + account.name + '"';
+			account_string += ' "Value" GAUGE Number ' + account.value;
 
-		# append the account onto the accounts array, in our current account type
-		accountType[:accounts] << account
-	end
-	# append the account type onto our account types array
-	accountTypes << accountType
-end
-#puts accountTypes
+			for(var k = 0; k < meta.length; k++) {
+				account_string += ' "' + meta[k].name + '" GAUGE Number ' + meta[k].value;
+			}
 
-# pull down the budgets page and locate the spending section
-page = agent.get(URI.join hostname, "/planning.event")
-budgetTags = page.search("html > body > div#background-gradient > div#wrapper > div#body-container > div#main > div#spendingBudget-list > ul#spendingBudget-list-body > li")
+			this.echo(account_string);
+		}
+	}
+	// }}}
 
-# scrape the daters into an array of stuffs
-budgets = []
-budgetTags.each do |budgetTag|
-	# convert the tag to a string and extract the ID
-	budgetId = budgetTag.to_s.gsub("\n", "").sub(/^\s*<li\s*class="[^"]*"\s*id="\s*budget-([0-9]+).*$/, "\\1")
+	// Print budget data {{{
+	for(var i = 0; i < budget_data.budgets.length; i++) {
+		// Sometimes we don't manage to retrieve (or store, or something) budget data from the budgets page.
+		// We'll have to figure out the root cause and fix it but for not, just skipping if we failed prevents garbage from reaching SevOne.
+		if(!budget_data.budgets[i].name) {
+			continue;
+		}
 
-	# find and extract the name
-	budgetName = budgetTag.search("a.title").to_s.gsub("\n", "").sub(%r:\s*<a[^>]*>\s*<span>\s*([^>]+)\s*</span>.*<strong>([^>]+)\s*</strong>.*$:, "\\1: \\2")
+		var budget_string = budget_data.timestamp + ' "Budget: ' + budget_data.budgets[i].name + '" "Mint Budget: ' + budget_data.budgets[i].type + '" "' + budget_data.budgets[i].name + '"';
+		budget_string += ' "Limit" GAUGE Number ' + budget_data.budgets[i].limit;
+		budget_string += ' "Spent" GAUGE Number ' + budget_data.budgets[i].spent;
+		budget_string += ' "Percent Spent" GAUGE Percent ' + budget_data.budgets[i].percent;
+		this.echo(budget_string);
+	}
+	// }}}
 
-	# retrieve the value and budget limit
-	# NOTE: This is the raw HTML; try to view this via Firebug or Chrome's dev
-	#    tools, and the picture will be quite different.  My guess is that 
-	#    they're mangling the page with javascript
-	budgetSpent = budgetTag.search("div.budget-text > span.monthly-budget-text > span.budget-dollar")[1].to_s.gsub("\n", "").sub(%r:\s*<span[^>]*class="[^"]*budget-dollar[^"]*"[^>]*>\s*([0-9]+)\s*</span>.*$:, "\\1")
-	budgetLimit = budgetTag.search("div > div.set-budget-container > div.set-budget > strong.money > span")[1].to_s.gsub("\n", "").sub(%r:\s*<span[^>]*>\s*([0-9]+)\s*</span>.*$:, "\\1")
-
-	# append the budget onto the budgets array
-	budget = Hash[:id => budgetId, :name => html.decode(budgetName), :spent => budgetSpent, :limit => budgetLimit]
-	budgets << budget
-
-	# And output the budget
-	print now, ' "Budget: ', budget[:name], '" "Mint Budget: Spend" "', budget[:name], '"'
-	print ' "Limit" GAUGE Number ', budget[:limit]
-	print ' "Spent" GAUGE Number ', budget[:spent]
-	print ' "Percent Spent" GAUGE Percent ', ((budget[:spent].to_f / budget[:limit].to_f) * 100)
-	print "\n"
-end
-#puts budgets
-
-# refresh our account values; hopefully we get no failures, and everything refreshes within a minute and a half
-page = agent.get(URI.join hostname, "/overview.event")
-token = JSON.parse(page.search("input#javascript-user")[0].attr("value"))['token']
-agent.post(URI.join(hostname, "/refreshFILogins.xevent"), "token" => token)
+	phantom.exit(1);
+});
 
