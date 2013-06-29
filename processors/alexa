@@ -73,28 +73,6 @@ page = lxml.html.fromstring(response.read())
 sys.stdout.write(' "US 3-month rank" GAUGE Number ' + usrank)
 #sys.stdout.write(' "Reputation" GAUGE Number ' + reputation)
 
-# There's a new "how engaged are visitors" section, grab the data from there.  ALL THE DATA!
-def print_engagement_values(value_element, delta_element, name, unit):
-	value = get_numbers(value_element.text)
-	if(len(value) > 1):
-		value = secs_to_mins(value)
-	else:
-		(value,) = value
-	delta = regex_engagement_delta.match(delta_element.get('title'))
-	(delta_direction, delta_value) = delta.group(1, 2)
-	if(delta_direction == 'Down'):
-		delta = '-' + delta_value
-	else:
-		delta = delta_value
-	sys.stdout.write(' "' + name + '" GAUGE ' + unit + ' ' + value)
-	sys.stdout.write(' "' + name + ' (change)" GAUGE Percent ' + delta)
-(engagement,) = big_container.cssselect('div#engagement-content')
-engagement_values = engagement.cssselect('span.col-8 > span > span > div > strong')
-engagement_deltas = engagement.cssselect('span.col-8 > span > span > div > span')
-print_engagement_values(engagement_values[0], engagement_deltas[0], 'Bounce rate', 'Number')
-print_engagement_values(engagement_values[1], engagement_deltas[1], 'Daily pageviews per visitor', 'Number')
-print_engagement_values(engagement_values[2], engagement_deltas[2], 'Daily time on site', 'Minutes')
-
 # Find the lower part of the page
 (tabs,) = big_container.cssselect('div#tw-tabmodule > div#tw-tabContainers')
 
