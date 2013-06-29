@@ -1,0 +1,39 @@
+#!/usr/bin/casperjs
+
+var system = require('system');
+var utils = require('utils');
+var fs = require('fs');
+
+// casperjs adds three args to the beginning
+if(system.args.length != 5) {
+	this.echo('usage: facebook page');
+	phantom.exit(1);
+}
+
+var page = system.args[4];
+
+var casper = require('casper').create();
+casper.userAgent('Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31');
+
+var timestamp = Math.round(new Date().getTime() / 1000);
+
+casper.start('https://www.facebook.com/pages/' + page);
+casper.then(function scrapeData() {
+	var nameRegex = new RegExp('<span itemprop="name">([^<]+)</span>');
+	var scrapeRegex = new RegExp('<div class="fsm fwn fcg"><div class="fsm fwn fcg">([0-9,]+) likes.*?([0-9,]+) talking about this</div></div>');
+	var numberRegex = new RegExp('[^0-9]', 'g');
+
+	var name = nameRegex.exec(this.getHTML());
+	var match = scrapeRegex.exec(this.getHTML());
+
+	var name = name[1];
+	var likes = match[1].replace(numberRegex, '');
+	var talkingAbout = match[2].replace(numberRegex, '');
+
+	this.echo(timestamp + ' "Facebook - \'' + name + '\'" "Facebook page" "Statistics for Facebook page \'' + name + '\'" Likes GAUGE Number ' + likes + ' "People talking about this" GAUGE Number ' + talkingAbout);
+});
+
+casper.run(function exitHappy() {
+	phantom.exit(0);
+});
+
