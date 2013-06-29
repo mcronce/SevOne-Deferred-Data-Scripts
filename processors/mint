@@ -353,6 +353,6 @@ casper.run(function printAllData() {
 	}
 	// }}}
 
-	phantom.exit(1);
+	phantom.exit(0);
 });
 
