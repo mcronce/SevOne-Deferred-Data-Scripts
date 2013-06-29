@@ -10,6 +10,8 @@ from optparse import OptionParser
 
 # Constants {{{
 regex_number = re.compile('-?[0-9,.]+')
+regex_engagement_delta = re.compile('^(Down|Up) ([0-9.]+)%.*$')
+regex_time = re.compile('([0-9]+):([0-9]+):?([0-9]+)?')
 # }}}
 
 def get_numbers(string): # {{{
@@ -23,7 +25,7 @@ def get_numbers(string): # {{{
 	return numbers
 # }}}
 
-def mins_to_secs(numbers): # {{{
+def secs_to_mins(numbers): # {{{
 	return str((int(numbers[0]) + (int(numbers[1]) / 60.0)))
 # }}}
 
@@ -65,17 +67,36 @@ page = lxml.html.fromstring(response.read())
 (big_container,) = page.cssselect('html > body > div#pageContainer > div#page > div.page-width > div#threecolwrap')
 
 # Get the stats from the top part of the page
-(table,) = big_container.cssselect('div#siteinfo-site-summary > span > div#site > section#summary-site-stats > table#siteStats > tbody > tr.data-row1')
-datadivs = table.cssselect('td > div.data')
-#(rank,) = get_numbers(datadivs[0].cssselect('a')[0].text)
-(usrank,) = get_numbers(datadivs[1].text_content())
-(reputation,) = get_numbers(datadivs[2].cssselect('a')[0].text)
+(datacontainer,) = big_container.cssselect('section#traffic-rank-content > div.row > span > div.rank-row > span.countryRank > span > div > strong')
+(usrank,) = get_numbers(datacontainer.text_content())
 #sys.stdout.write(' "Rank (global)" GAUGE Number ' + rank)
 sys.stdout.write(' "US 3-month rank" GAUGE Number ' + usrank)
-sys.stdout.write(' "Reputation" GAUGE Number ' + reputation)
+#sys.stdout.write(' "Reputation" GAUGE Number ' + reputation)
+
+# There's a new "how engaged are visitors" section, grab the data from there.  ALL THE DATA!
+def print_engagement_values(value_element, delta_element, name, unit):
+	value = get_numbers(value_element.text)
+	if(len(value) > 1):
+		value = secs_to_mins(value)
+	else:
+		(value,) = value
+	delta = regex_engagement_delta.match(delta_element.get('title'))
+	(delta_direction, delta_value) = delta.group(1, 2)
+	if(delta_direction == 'Down'):
+		delta = '-' + delta_value
+	else:
+		delta = delta_value
+	sys.stdout.write(' "' + name + '" GAUGE ' + unit + ' ' + value)
+	sys.stdout.write(' "' + name + ' (change)" GAUGE Percent ' + delta)
+(engagement,) = big_container.cssselect('div#engagement-content')
+engagement_values = engagement.cssselect('span.col-8 > span > span > div > strong')
+engagement_deltas = engagement.cssselect('span.col-8 > span > span > div > span')
+print_engagement_values(engagement_values[0], engagement_deltas[0], 'Bounce rate', 'Number')
+print_engagement_values(engagement_values[1], engagement_deltas[1], 'Daily pageviews per visitor', 'Number')
+print_engagement_values(engagement_values[2], engagement_deltas[2], 'Daily time on site', 'Minutes')
 
 # Find the lower part of the page
-(tabs,) = big_container.cssselect('div.row > div#onecolwrap > section#content > div#content-inner > div#siteinfotabs > div#trafficstats_div > div#tw-tabmodule > div#tw-tabContainers')
+(tabs,) = big_container.cssselect('div#tw-tabmodule > div#tw-tabContainers')
 
 # Parse the "traffic stats" tab
 rows = tabs.cssselect('div#rank > table.rank > tr')
@@ -134,9 +155,9 @@ sys.stdout.write(' "3-month bounce% (change%)" GAUGE Percent ' + threemonth_chan
 
 # Parse the "time on site" tab
 rows = tabs.cssselect('div#time_on_site > table.time_on_site_min > tr')
-onemonth = mins_to_secs(get_numbers(rows[1].cssselect('td.avg')[0].text))
+onemonth = secs_to_mins(get_numbers(rows[1].cssselect('td.avg')[0].text))
 (onemonth_change,) = get_numbers(rows[1].cssselect('td.percent')[0].text)
-threemonth = mins_to_secs(get_numbers(rows[2].cssselect('td.avg')[0].text))
+threemonth = secs_to_mins(get_numbers(rows[2].cssselect('td.avg')[0].text))
 (threemonth_change,) = get_numbers(rows[2].cssselect('td.percent')[0].text)
 sys.stdout.write(' "1-month time on site" GAUGE Minutes ' + onemonth)
 sys.stdout.write(' "1-month time on site (change%)" GAUGE Percent ' + onemonth_change)
