@@ -223,9 +223,9 @@ casper.then(function scheduleScrapingTransactionPages() {
 								break;
 							case 'credit':
 								account_metadata.specifics = [
-									{'name' : 'Available Credit', 'value' : metaCells[1].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-')},
-									{'name' : 'Total Credit', 'value' : metaCells[2].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-')},
-									{'name' : 'APR', 'value' : metaCells[3].innerText.replace(re.trim, '').replace(re.percent2number, '').replace(re.fix_minus, '-')},
+									{'name' : 'Available Credit', 'value' : parseFloat(metaCells[1].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-'))},
+									{'name' : 'Total Credit', 'value' : parseFloat(metaCells[2].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-'))},
+									{'name' : 'APR', 'value' : parseFloat(metaCells[3].innerText.replace(re.trim, '').replace(re.percent2number, '').replace(re.fix_minus, '-'))},
 									{'name' : 'Total Fees', 'value' : metaCells[4].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-')}
 								];
 								break;
