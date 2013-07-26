@@ -3,7 +3,7 @@ path='/usr/bin'
 SOCKET="/tmp/rpi_ssh_$$";
 
 if [ "$#" -lt 1 ]; then
-	echo 'Usage: raspberry-pi ip.or.hostname [/path/to/vcgencmd]' >/dev/stderr;
+	echo 'Usage: raspberry-pi sshuser@ip.or.hostname [/path/to/vcgencmd]' >/dev/stderr;
 else
 	IP="$1";
 	if [ "$#" -gt 1 ]; then

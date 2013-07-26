@@ -166,7 +166,7 @@ raspberry-pi
 * Usage:
 
 
-    raspberry-pi ip.or.hostname [/path/containing/vcgencmd]
+    raspberry-pi sshuser@ip.or.hostname [/path/containing/vcgencmd]
 
 This processor connects to a Raspberry Pi running one of the many flavors of
 Linux that support the little computer.  
