@@ -1,0 +1,44 @@
+#!/bin/bash
+path='/usr/bin'
+SOCKET="/tmp/rpi_ssh_$$";
+
+if [ "$#" -lt 1 ]; then
+	echo 'Usage: raspberry-pi ip.or.hostname [/path/to/vcgencmd]' >/dev/stderr;
+else
+	IP="$1";
+	if [ "$#" -gt 1 ]; then
+		path="$2";
+	fi;
+fi;
+
+ssh -S "${SOCKET}" -o StrictHostKeyChecking=no -M -N -f -c blowfish "$IP" >/dev/null 2>&1;
+
+echo -n "$(date +%s) 'Raspberry Pi' 'Raspberry Pi' 'Raspberry Pi voltage/clock/memory statistics' ";
+echo -n "'CPU temperature' GAUGE 'Degrees C' '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd measure_temp" | sed 's/^temp=\([0-9.]\+\).*$/\1/')' ";
+echo -n "'CPU clock speed' GAUGE Hertz '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd measure_clock arm" | sed 's/^.*=//')' ";
+echo -n "'Core clock speed' GAUGE Hertz '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd measure_clock core" | sed 's/^.*=//')' ";
+echo -n "'H264 clock speed' GAUGE Hertz '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd measure_clock h264" | sed 's/^.*=//')' ";
+echo -n "'ISP clock speed' GAUGE Hertz '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd measure_clock isp" | sed 's/^.*=//')' ";
+echo -n "'V3D clock speed' GAUGE Hertz '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd measure_clock v3d" | sed 's/^.*=//')' ";
+echo -n "'UART clock speed' GAUGE Hertz '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd measure_clock uart" | sed 's/^.*=//')' ";
+echo -n "'PWM clock speed' GAUGE Hertz '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd measure_clock pwm" | sed 's/^.*=//')' ";
+echo -n "'EMMC clock speed' GAUGE Hertz '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd measure_clock emmc" | sed 's/^.*=//')' ";
+echo -n "'Pixel clock speed' GAUGE Hertz '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd measure_clock pixel" | sed 's/^.*=//')' ";
+echo -n "'VEC clock speed' GAUGE Hertz '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd measure_clock vec" | sed 's/^.*=//')' ";
+echo -n "'HDMI clock speed' GAUGE Hertz '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd measure_clock hdmi" | sed 's/^.*=//')' ";
+echo -n "'DPI clock speed' GAUGE Hertz '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd measure_clock dpi" | sed 's/^.*=//')' ";
+echo -n "'Core voltage' GAUGE Volts '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd measure_volts core" | sed 's/^.*=\([0-9.]\+\).*$/\1/')' ";
+echo -n "'SDRAM-c voltage' GAUGE Volts '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd measure_volts sdram_c" | sed 's/^.*=\([0-9]\+\).*$/\1/')' ";
+echo -n "'SDRAM-i voltage' GAUGE Volts '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd measure_volts sdram_i" | sed 's/^.*=\([0-9]\+\).*$/\1/')' ";
+echo -n "'SDRAM-p voltage' GAUGE Volts '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd measure_volts sdram_p" | sed 's/^.*=\([0-9]\+\).*$/\1/')' ";
+echo -n "'System RAM' GAUGE Megabytes '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd get_mem arm" | sed 's/^.*=\([0-9]\+\).*$/\1/')' ";
+echo -n "'Graphics RAM' GAUGE Megabytes '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd get_mem gpu" | sed 's/^.*=\([0-9]\+\).*$/\1/')' ";
+load_averages="$(ssh -S "${SOCKET}" -q "$IP" 'uptime' | sed 's/^.*load average: \([0-9.]\+\), \([0-9.]\+\), \([0-9.]\+\).*$/\1,\2,\3/') ";
+echo -n "'1-minute load average' GAUGE Number $(echo "$load_averages" | sed 's/^\(.*\),.*,.*$/\1/') ";
+echo -n "'5-minute load average' GAUGE Number $(echo "$load_averages" | sed 's/^.*,\(.*\),.*$/\1/') ";
+echo -n "'15-minute load average' GAUGE Number $(echo "$load_averages" | sed 's/^.*,.*,\(.*\)$/\1/') ";
+echo;
+
+ssh -S "${SOCKET}" -O exit "$1" >/dev/null 2>&1;
+rm -f "/tmp/rpi_ssh_$$";
+

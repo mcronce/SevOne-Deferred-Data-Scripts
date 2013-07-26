@@ -157,3 +157,27 @@ Python dependencies:
 * optparse
 * time
 
+
+
+raspberry-pi
+============
+* Language: bash
+* Type:     System poller
+* Usage:
+
+
+    raspberry-pi ip.or.hostname [/path/containing/vcgencmd]
+
+This processor connects to a Raspberry Pi running one of the many flavors of
+Linux that support the little computer.  
+
+The statistics this exports include current temperature, clocks, voltages, and
+system load.
+
+Note that passwordless SSH from the system running this poller to the Raspberry
+Pi must be enabled; also, the vcgencmd binary must be present somewhere on the
+Raspberry Pi's filesystem.  By default, this looks for vcgencmd in the path
+that OpenELEC places it in (/usr/bin); if your vcgencmd binary is elsewhere,
+you must pass that path in (e.g. "/opt/vc/bin" for Debian Wheezy) as the second
+parameter.
+
