@@ -181,3 +181,26 @@ that OpenELEC places it in (/usr/bin); if your vcgencmd binary is elsewhere,
 you must pass that path in (e.g. "/opt/vc/bin" for Debian Wheezy) as the second
 parameter.
 
+
+
+ampache
+=======
+* Language:  Python
+* Type:      Database processor
+* Reference: http://www.ampache.org/
+* Usage:
+
+
+    ampache [options] mysql-host 'MySQL user' 'MySQL password' 'MySQL db'
+
+This processor connects to a MySQL database backing an Ampache instance, does
+some processing, and exports some statistics about posts, metadata, comments,
+categories, and tags.
+
+Python dependencies:
+* calendar
+* datetime
+* MySQLdb
+* optparse
+* time
+

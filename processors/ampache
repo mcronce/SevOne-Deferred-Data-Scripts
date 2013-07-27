@@ -1,0 +1,107 @@
+#!/usr/bin/python2
+import calendar
+import re
+import sys
+import time
+import MySQLdb as mysql
+from datetime import datetime
+from optparse import OptionParser
+
+# fix bad char stuffs
+import string
+
+def get_timestamp(): # {{{
+	return str(int(time.mktime(datetime.now().timetuple())))
+# }}} 
+
+def table(name): # {{{
+	global options
+	return options.table_prefix + name
+# }}}
+
+# parse command-line arguments {{{
+cmdline = OptionParser(usage = 'usage: %prog [options] mysql_host mysql_user mysql_password mysql_database')
+cmdline.add_option('-t', '--table-prefix', action = 'store', dest = 'table_prefix', default = '', help = 'The prefix for Ampache tables in this database')
+
+(options, args) = cmdline.parse_args()
+if(len(args) != 4):
+	cmdline.print_help()
+	sys.exit(1)
+
+(mysql_host, mysql_user, mysql_password, mysql_database) = args
+# }}}
+
+dbconn = mysql.connect(mysql_host, mysql_user, mysql_password, mysql_database)
+
+with dbconn:
+	db = dbconn.cursor()
+
+	sys.stdout.write(get_timestamp() + ' "Ampache library" "Ampache library" "Ampache library statistics"')
+
+	query = 'SELECT COUNT(*) FROM ' + table('user')
+	db.execute(query)
+	(users,) = db.fetchone()
+	sys.stdout.write(' "Total users" GAUGE Number ' + str(users))
+
+	query = 'SELECT COUNT(*) FROM ' + table('user') + ' WHERE disabled = 0'
+	db.execute(query)
+	(users_enabled,) = db.fetchone()
+	sys.stdout.write(' "Enabled users" GAUGE Number ' + str(users_enabled))
+
+	query = 'SELECT COUNT(*) FROM ' + table('user') + ' WHERE disabled = 1'
+	db.execute(query)
+	(users_disabled,) = db.fetchone()
+	sys.stdout.write(' "Disabled users" GAUGE Number ' + str(users_disabled))
+
+	query = 'SELECT COUNT(*) FROM ' + table('catalog')
+	db.execute(query)
+	(catalogs,) = db.fetchone()
+	sys.stdout.write(' "Catalogs" GAUGE Number ' + str(catalogs))
+
+	query = 'SELECT COUNT(*) FROM ' + table('album')
+	db.execute(query)
+	(albums,) = db.fetchone()
+	sys.stdout.write(' "Albums" GAUGE Number ' + str(albums))
+
+	query = 'SELECT COUNT(*) FROM ' + table('artist')
+	db.execute(query)
+	(artists,) = db.fetchone()
+	sys.stdout.write(' "Artists" GAUGE Number ' + str(artists))
+
+	query = 'SELECT COUNT(*) FROM ' + table('playlist')
+	db.execute(query)
+	(playlists,) = db.fetchone()
+	sys.stdout.write(' "Playlists" GAUGE Number ' + str(playlists))
+
+	query = 'SELECT COUNT(*) FROM song'
+	db.execute(query)
+	(songs,) = db.fetchone()
+	sys.stdout.write(' "Songs" GAUGE Number ' + str(songs))
+
+	query = 'SELECT COUNT(*) FROM tag'
+	db.execute(query)
+	(tags,) = db.fetchone()
+	sys.stdout.write(' "Tags" GAUGE Number ' + str(tags))
+
+	query = 'SELECT COUNT(*) FROM video'
+	db.execute(query)
+	(videos,) = db.fetchone()
+	sys.stdout.write(' "Videos" GAUGE Number ' + str(videos))
+
+	query = 'SELECT AVG(count) FROM (SELECT COUNT(*) AS count, playlist FROM playlist_data GROUP BY playlist) AS sub'
+	db.execute(query)
+	(avg_playlist_length,) = db.fetchone()
+	sys.stdout.write(' "Average playlist length" GAUGE Number ' + str(avg_playlist_length))
+
+	sys.stdout.write(' "Average songs per album" GAUGE Number ' + str(songs / albums))
+	sys.stdout.write(' "Average songs per artist" GAUGE Number ' + str(songs / artists))
+
+	query = 'SELECT SUM(song.size) FROM song LEFT JOIN object_count ON song.id = object_count.object_id AND object_count.object_type = \'song\''
+	db.execute(query)
+	(total_bandwidth,) = db.fetchone()
+	sys.stdout.write(' "Total bandwidth consumed" GAUGE Bytes ' + str(total_bandwidth))
+
+	sys.stdout.write(' "Average bandwidth per user" GAUGE Bytes ' + str(total_bandwidth / users))
+
+sys.stdout.write("\n")
+
