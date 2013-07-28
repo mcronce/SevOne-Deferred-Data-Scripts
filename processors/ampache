@@ -73,22 +73,22 @@ with dbconn:
 	(playlists,) = db.fetchone()
 	sys.stdout.write(' "Playlists" GAUGE Number ' + str(playlists))
 
-	query = 'SELECT COUNT(*) FROM song'
+	query = 'SELECT COUNT(*) FROM ' + table('song')
 	db.execute(query)
 	(songs,) = db.fetchone()
 	sys.stdout.write(' "Songs" GAUGE Number ' + str(songs))
 
-	query = 'SELECT COUNT(*) FROM tag'
+	query = 'SELECT COUNT(*) FROM ' + table('tag')
 	db.execute(query)
 	(tags,) = db.fetchone()
 	sys.stdout.write(' "Tags" GAUGE Number ' + str(tags))
 
-	query = 'SELECT COUNT(*) FROM video'
+	query = 'SELECT COUNT(*) FROM ' + table('video')
 	db.execute(query)
 	(videos,) = db.fetchone()
 	sys.stdout.write(' "Videos" GAUGE Number ' + str(videos))
 
-	query = 'SELECT AVG(count) FROM (SELECT COUNT(*) AS count, playlist FROM playlist_data GROUP BY playlist) AS sub'
+	query = 'SELECT AVG(count) FROM (SELECT COUNT(*) AS count, playlist FROM ' + table('playlist_data') + ' GROUP BY playlist) AS sub'
 	db.execute(query)
 	(avg_playlist_length,) = db.fetchone()
 	sys.stdout.write(' "Average playlist length" GAUGE Number ' + str(avg_playlist_length))
@@ -96,7 +96,7 @@ with dbconn:
 	sys.stdout.write(' "Average songs per album" GAUGE Number ' + str(songs / albums))
 	sys.stdout.write(' "Average songs per artist" GAUGE Number ' + str(songs / artists))
 
-	query = 'SELECT SUM(song.size) FROM song LEFT JOIN object_count ON song.id = object_count.object_id AND object_count.object_type = \'song\''
+	query = 'SELECT SUM(song.size) FROM ' + table('song') + ' AS song INNER JOIN ' + table('object_count') + ' AS object_count ON song.id = object_count.object_id AND object_count.object_type = \'song\''
 	db.execute(query)
 	(total_bandwidth,) = db.fetchone()
 	sys.stdout.write(' "Total bandwidth consumed" GAUGE Bytes ' + str(total_bandwidth))
