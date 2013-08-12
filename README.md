@@ -204,3 +204,27 @@ Python dependencies:
 * optparse
 * time
 
+
+
+plex-media-server
+=================
+* Language:  Python
+* Type:      API
+* Reference: http://www.plexapp.com/
+* Usage:
+
+
+    plex-media-server [options] plex-host
+
+This processor connect to a system running Plex Media Server and scrapes
+statistics about the various libraries using the REST API.
+
+It should be noted that Plex Media Server seems to hit the CPU on its host hard
+while this scraper is running.
+
+Python dependencies:
+* calendar
+* datetime
+* lxml
+* optparse
+* time
