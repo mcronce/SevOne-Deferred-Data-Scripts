@@ -390,7 +390,7 @@ def handle_show_section_only_specifics(url): # {{{
 # }}}
 
 def handle_show_library(key, title): # {{{
-	sys.stdout.write(get_date() + ' "Plex TV show library ' + key + '" Plex Media Server show library" "' + title + '"')
+	sys.stdout.write(get_date() + ' "Plex TV show library ' + key + '" "Plex Media Server show library" "' + title + '"')
 	library_page = parse_page(server + '/library/sections/' + key)
 
 	all_shows = handle_show_section_simple('All', server + '/library/sections/' + key + '/all')
@@ -539,7 +539,7 @@ def handle_music_section_with_specifics(name, url, mask_name_regex = None): # {{
 # }}}
 
 def handle_music_library(key, title): # {{{
-	sys.stdout.write(get_date() + ' "Plex music library ' + key + '" Plex Media Server music library" "' + title + '"')
+	sys.stdout.write(get_date() + ' "Plex music library ' + key + '" "Plex Media Server music library" "' + title + '"')
 	library_page = parse_page(server + '/library/sections/' + key)
 
 	handle_artist_grouping('All', server + '/library/sections/' + key + '/all')
