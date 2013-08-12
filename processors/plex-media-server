@@ -415,7 +415,7 @@ def handle_show_library(key, title): # {{{
 
 # music stuff {{{
 def music_struct(artists, albums, songs, duration, size): # {{{
-	return {'artists' : float(artists), 'albums' : float(albums), 'songs' : float(albums), 'duration' : float(duration), 'size' : float(duration)}
+	return {'artists' : float(artists), 'albums' : float(albums), 'songs' : float(songs), 'duration' : float(duration), 'size' : float(duration)}
 # }}}
 
 def add_to_music_struct(original, artists, albums, songs, duration, size): # {{{
