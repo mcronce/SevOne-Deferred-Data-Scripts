@@ -216,6 +216,7 @@ function report_stats($deviceId, $time, $objectType, $objectName, $objectDescrip
 	$ot = $client->plugin_deferred_getObjectTypeByOsIdAndName(0, $objectType);
 	if(!$ot) {
 		$otid = $client->plugin_deferred_createObjectType(0, $objectType);
+		sleep(5);
 		$ot = $client->plugin_deferred_getObjectTypeById($otid);
 	}
 	if(!$ot) {
