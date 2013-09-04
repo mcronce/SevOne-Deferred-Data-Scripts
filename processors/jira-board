@@ -1,0 +1,179 @@
+#!/usr/bin/casperjs
+
+var system = require('system');
+var utils = require('utils');
+var fs = require('fs');
+
+// casperjs adds three args to the beginning
+if(system.args.length != 7) {
+	this.echo('usage: jira-board url username password');
+	phantom.exit(1);
+}
+
+String.prototype.toProperCase = function toProperCase() {
+	return this.replace(/\w\S*/g, function _toProperCase(txt) {
+		return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+	});
+};
+
+var board_url = system.args[4];
+var username = system.args[5];
+var password = system.args[6];
+
+var casper = require('casper').create();
+casper.userAgent('Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31');
+
+// looks like we need to do this part to force the onLoad javascript to run?...
+function javascriptOnLoad() {
+	document.onLoad = function _javascriptOnLoad(e) {
+		window.siteLoaded = true;
+	};
+	return true;
+}
+
+function javascriptLoadedCheck() {
+	return this.evaluate(function() {
+		return window.siteLoaded === true;
+	}) === true;
+}
+
+var address_parts = /^([a-z]+):\/\/([^\/]+)/.exec(board_url);
+var jira_login_address = address_parts[1] + '://' + address_parts[2] + '/login.jsp';
+
+casper.start(jira_login_address, function loadJira() {
+	this.evaluateOrDie(javascriptOnLoad);
+});
+
+// This is some debug code that prints out the URL to every single resource that a page loads.
+/*casper.on('resource.received', function onResourceReceived(resource) {
+	this.echo('--- ' + resource.url);
+});*/
+
+// This is some debug code that prints remote (in-page) log statements to the local console.
+/*casper.on('remote.message', function onRemoteMessage(msg) {
+	this.echo('+++ ' + msg);
+});*/
+
+casper.then(function login() {
+	this.fill('form#login-form', {
+		'os_username' : username,
+		'os_password' : password
+	}, true);
+});
+
+casper.thenOpen(board_url);
+//casper.thenEvaluate(javascriptOnLoad);
+//casper.waitFor(javascriptLoadedCheck, undefined, undefined, 15000);
+
+var current_timestamp;
+casper.then(function setTimestamp() {
+	current_timestamp = Math.round(new Date().getTime() / 1000);
+});
+
+var boardName = null;
+casper.waitForSelector('h2#ghx-board-name', undefined, undefined, 15000);
+casper.then(function getBoardName() {
+	boardName = this.evaluate(function _getBoardName() {
+		var h2 = document.querySelector('h2#ghx-board-name');
+		console.log(h2.innerText);
+		return h2.innerText;
+	});
+});
+
+var headers = null;
+casper.waitForSelector('ul#ghx-column-headers', undefined, undefined, 15000);
+casper.then(function getHeaders() {
+	headers = this.evaluate(function _getHeaders() {
+		var ul = document.querySelector('ul#ghx-column-headers');
+		var headers = ul.querySelectorAll('li.ghx-column');
+
+		var returnData = [];
+		for(var i = 0; i < headers.length; i++) {
+			var header = headers[i];
+			var name = header.querySelector('h2').innerText;
+			var quantity = header.querySelector('div.ghx-qty').innerText;
+			returnData.push({'name' : name, 'total' : quantity});
+		}
+
+		return returnData;
+	});
+});
+
+var priorityData;
+casper.waitForSelector('div#ghx-pool > div.ghx-swimlane.ghx-first > ul.ghx-columns > li.ghx-column', undefined, undefined, 15000);
+casper.then(function getPriorityData() {
+	priorityData = this.evaluate(function _getPriorityData() {
+		var columns = document.querySelectorAll('div#ghx-pool > div.ghx-swimlane.ghx-first > ul.ghx-columns > li.ghx-column');
+		
+		var returnData = [];
+		for(var i = 0; i < columns.length; i++) {
+			var column = columns[i];
+			var thisColumnData = {
+				'blocker'  : {'count' : 0, 'time_min' : null, 'time_max' : null, 'time_avg' : 0},
+				'critical' : {'count' : 0, 'time_min' : null, 'time_max' : null, 'time_avg' : 0},
+				'major'    : {'count' : 0, 'time_min' : null, 'time_max' : null, 'time_avg' : 0},
+				'minor'    : {'count' : 0, 'time_min' : null, 'time_max' : null, 'time_avg' : 0},
+				'cosmetic' : {'count' : 0, 'time_min' : null, 'time_max' : null, 'time_avg' : 0}
+			};
+			var tickets = column.querySelectorAll('div.ghx-issue');
+
+			for(var j = 0; j < tickets.length; j++) {
+				var ticket = tickets[j];
+				var priority = ticket.querySelector('div.ghx-flags > span.ghx-priority').getAttribute('title').toLowerCase();
+
+				if(thisColumnData[priority] === undefined) {
+					continue;
+				}
+
+				thisColumnData[priority].count++;
+				var timeInColumn = /^([0-9]+) day/.exec(ticket.querySelector('div.ghx-days').getAttribute('title'))[1] * 1;
+
+				if(thisColumnData[priority].time_min === null || timeInColumn < thisColumnData[priority].time_min) {
+					thisColumnData[priority].time_min = timeInColumn;
+				}
+
+				if(thisColumnData[priority].time_max === null || timeInColumn > thisColumnData[priority].time_max) {
+					thisColumnData[priority].time_max = timeInColumn;
+				}
+
+				thisColumnData[priority].time_avg += timeInColumn;
+			}
+
+			for(var priority in thisColumnData) {
+				if(thisColumnData[priority].time_min === null) {
+					thisColumnData[priority].time_min = 0;
+				}
+
+				if(thisColumnData[priority].time_max === null) {
+					thisColumnData[priority].time_max = 0;
+				}
+
+				if(thisColumnData[priority].time_avg != 0) {
+					thisColumnData[priority].time_avg /= thisColumnData[priority].count;
+				}
+			}
+
+			returnData.push(thisColumnData);
+		}
+
+		return returnData;
+	});
+});
+
+casper.run(function printAllData() {
+	for(var i = 0; i < headers.length; i++) {
+		var column_string = current_timestamp + ' "' + boardName + ' Agile board - ' + headers[i].name + '" "' + boardName + ' Jira board" "' + boardName + ' ' + headers[i].name + '"';
+		column_string += ' "Total issues" GAUGE Number ' + headers[i].total;
+
+		for(var priority in priorityData[i]) {
+			column_string += ' "' + priority.toProperCase() + ' issues" GAUGE Number ' + priorityData[i][priority].count;
+			column_string += ' "' + priority.toProperCase() + ' issues - minimum time in column" GAUGE Number ' + priorityData[i][priority].time_min;
+			column_string += ' "' + priority.toProperCase() + ' issues - maximum time in column" GAUGE Number ' + priorityData[i][priority].time_max;
+			column_string += ' "' + priority.toProperCase() + ' issues - average time in column" GAUGE Number ' + priorityData[i][priority].time_avg;
+		}
+
+		this.echo(column_string);
+	}
+	phantom.exit(0);
+});
+

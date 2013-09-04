@@ -228,3 +228,18 @@ Python dependencies:
 * lxml
 * optparse
 * time
+
+
+jira-board
+==========
+* Language:  CasperJS
+* Type:      Screen scraper
+* Reference: https://www.atlassian.com/software/jira
+* Usage:
+
+
+	jira-board 'board URL' 'Jira username' 'Jira password'
+
+This processor logs into a Jira server, navigates to an Agile board, and
+exports some statistics about the issues on that Agile board.
+
