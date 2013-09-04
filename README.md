@@ -216,7 +216,7 @@ plex-media-server
 
     plex-media-server [options] plex-host
 
-This processor connect to a system running Plex Media Server and scrapes
+This processor connects to a system running Plex Media Server and scrapes
 statistics about the various libraries using the REST API.
 
 It should be noted that Plex Media Server seems to hit the CPU on its host hard
