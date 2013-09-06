@@ -38,6 +38,9 @@ deferred-data-backfill
 This works exactly the same way as deferred-data-import, but is optimized for
 backfilling a large volume of historical data by making use of the multi-row
 insert functionality in SevOne's plugin_deferred_insertDataRows() API function.
+It further optimizes for large data volume by caching, in memory, metadata that
+would otherwise be retrieved from the SevOne appliance for every input line;
+object types, indicator types, objects, and indicators.
 
 
 
