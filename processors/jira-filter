@@ -100,7 +100,7 @@ for o, a in opts:
 		username = a
 	elif(o == '-p' or o == '--password'):
 		password = a
-	elif(o == 'n' or o == '--name'):
+	elif(o == '-n' or o == '--name'):
 		nameOverride = a
 	elif(o == '-h' or o == '--help'):
 		usage()
