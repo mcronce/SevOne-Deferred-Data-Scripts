@@ -233,6 +233,7 @@ Python dependencies:
 * time
 
 
+
 jira-board
 ==========
 * Language:  CasperJS
@@ -245,4 +246,26 @@ jira-board
 
 This processor logs into a Jira server, navigates to an Agile board, and
 exports some statistics about the issues on that Agile board.
+
+
+
+jira-filter
+==========
+* Language:  Python
+* Type:      API
+* Reference: http://www.atlassian.com/software/bamboo
+* Usage:
+
+
+	jira-filter -u username -p password [options] "filter-ID-or-JQL"
+
+Provided you have Python and the dependencies installed, this one is easy. I'll
+list the depdencies below.
+
+Python dependencies:
+* getopt
+* urllib2
+* calendar
+* json
+* datetime
 

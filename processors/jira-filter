@@ -1,0 +1,141 @@
+#!/usr/bin/python2
+import calendar
+import getopt
+import json
+import re
+import sys
+import time
+import urllib
+import urllib2
+from datetime import datetime
+
+# fix bad char stuffs
+import string
+
+def usage(): # {{{
+	print 'Usage:'
+	print '    jira-filter -u username -p password [options] "filter-id-or-JQL"'
+	print 'Description:'
+	print '    Using its REST API, pulls data from Jira about recent tests and'
+	print '       massages it into a format suitable for piping into the SevOne'
+	print '       generic Deferred Data adapter.'
+	print 'Options:'
+	print ' -h, --help           Print this help message'
+	print ' -u, --username=USER  Required; use USER as the username for Jira'
+	print ' -p, --password=PASS  Required; use PASS as the password for Jira'
+	print ' -a, --address=ADDR   Use ADDR as the Jira url; default: http://jira/'
+	print '                      Note that this must match the form protocol://address/'
+	print ' -n, --name=NAME      Use NAME as an override for the filter name.  If JQL'
+	print '                      is passed instead of a filter ID, this is required; if'
+	print '                      a filter ID is passed, this will be used instead of'
+	print '                      the retieved filter name'
+# }}}
+
+def get_timestamp(): # {{{
+	return str(int(time.mktime(datetime.now().timetuple())))
+# }}}
+
+# CLEVERLY NAMED function to retrieve a remote URL
+def curl(url, data = None): # {{{
+	url = jiraUrl + 'rest/api/2' + url
+	req = urllib2.Request(url)
+	req.add_header('Authorization', authToken)
+
+	if(data != None):
+		req.add_data(urllib.urlencode(data))
+
+	try:
+		handle = urllib2.urlopen(req)
+	except IOError, e:
+		return ''
+	
+	data = handle.read()
+	return data 
+# }}}
+
+# Warning: This will loop forever if curl or json.loads() keeps throwing exceptions
+def curlJson(url, data = None): # {{{
+	jsonSuccess = False
+	failCount = 0
+	while(failCount < 5 and not jsonSuccess):
+		try:
+			daters = json.loads(curl(url, data))
+			jsonSuccess = True
+		except:
+			#print 'derped. herping again'
+			failCount = failCount + 1
+			jsonSuccess = False
+	if(failCount >= 5):
+		sys.exit()
+	return daters
+# }}}
+
+# We'll need this to determine whether the argument is a filter ID or JQL
+def is_integer(s): # {{{
+	try:
+		int(s)
+		return True
+	except ValueError:
+		return False
+# }}}
+
+# parse command-line arguments {{{
+try:
+	opts, args = getopt.getopt(sys.argv[1:], 'a:u:p:n:h', ['address=', 'username=', 'password=', 'name=', 'help'])
+except getopt.GetoptError, err:
+	print str(err)
+	usage()
+	sys.exit(2)
+
+jiraUrl = None
+username = None
+password = None
+backfill = False
+nameOverride = None
+
+for o, a in opts:
+	if(o == '-a' or o == '--address'):
+		jiraUrl = a
+	elif(o == '-u' or o == '--username'):
+		username = a
+	elif(o == '-p' or o == '--password'):
+		password = a
+	elif(o == 'n' or o == '--name'):
+		nameOverride = a
+	elif(o == '-h' or o == '--help'):
+		usage()
+		sys.exit()
+
+if(not(username and password)):
+	usage()
+	sys.exit(2)
+
+if(len(args) < 1):
+	usage()
+	sys.exit(2)
+
+if(not re.match('^[a-z]+://[a-z0-9.-]+/$', jiraUrl)):
+	usage()
+	sys.exit(2)
+
+jiraFilter = ' '.join(args)
+
+if(not is_integer(jiraFilter) and not nameOverride):
+	usage()
+	sys.exit(2)
+
+authToken = "Basic " + (username + ':' + password).encode("base64").rstrip()
+# }}}
+
+filterName = nameOverride
+
+if(is_integer(jiraFilter)):
+	filterData = curlJson('/filter/' + jiraFilter)
+	jiraFilter = filterData['jql']
+	if(not nameOverride):
+		filterName = filterData['name']
+
+filterData = curlJson('/search?maxResults=0&' + urllib.urlencode( {'jql' : jiraFilter}))
+
+print get_timestamp() + ' "' + filterName + '" "Jira filter" "Jira filter" "Total issues" GAUGE Number ' + str(filterData['total'])
+
