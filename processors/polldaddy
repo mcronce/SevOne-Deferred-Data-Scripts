@@ -1,0 +1,81 @@
+#!/usr/bin/python2
+import calendar
+import lxml.etree
+import lxml.html
+import mechanize
+import re
+import sys
+import time
+from datetime import datetime
+from optparse import OptionParser
+
+# Constants {{{
+regex_number = re.compile('-?[0-9,.]+')
+regex_time = re.compile('([0-9]+):([0-9]+):?([0-9]+)?')
+regex_label = re.compile('^[0-9]+\.\s*(.*)\s*$')
+# }}}
+
+def get_numbers(string): # {{{
+	numbers = regex_number.findall(string)
+	if(len(numbers) == 0):
+		return ['NULL']
+	
+	for i in xrange(len(numbers)):
+		numbers[i] = numbers[i].replace(',', '')
+	
+	return numbers
+# }}}
+
+def secs_to_mins(numbers): # {{{
+	return str((int(numbers[0]) + (int(numbers[1]) / 60.0)))
+# }}}
+
+# Parse command-line arguments {{{
+cmdline = OptionParser(usage = 'usage: %prog poll-id')
+
+(options, args) = cmdline.parse_args()
+if(len(args) != 1):
+	cmdline.print_help()
+	sys.exit(1)
+
+(poll_id,) = args
+# }}}
+
+# Browser setup {{{
+# Initialize the browser
+br = mechanize.Browser()
+
+# Enable some handlers
+br.set_handle_equiv(True)
+#br.set_handle_gzip(True)
+br.set_handle_redirect(True)
+br.set_handle_referer(True)
+br.set_handle_robots(False)
+
+# Don't hang on >0 refresh times
+br.set_handle_refresh(mechanize._http.HTTPRefreshProcessor(), max_time = 1)
+
+# Lie, cheat, and steal
+br.addheaders = [('User-agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31 AlexaToolbar/alxg-3.1')]
+# }}}
+
+# Retrieve the page, parse into an XML document, and find the root of the stuff we care about
+response = br.open('http://polldaddy.com/poll/' + poll_id + '/?view=results')
+page = lxml.html.fromstring(response.read())
+(big_container,) = page.cssselect('html > body > div#page > div#stage > div#stage-inner > div.grid > div.grid-left > form > div.poll')
+
+# Throw down our timestamp/object information
+poll_name = big_container.cssselect('h1')[0].text_content()
+sys.stdout.write(str(int(time.mktime(datetime.now().timetuple()))) + ' "' + poll_name + '" "Polldaddy poll" "Polldaddy poll statistics"')
+
+# Get the stats for each of the poll options
+for item in big_container.cssselect('ul > li'):
+	match = regex_label.match(item.cssselect('div.label')[0].text_content())
+	name = match.groups()[0]
+	votes = get_numbers(item.cssselect('div.votes')[0].text_content())[0]
+	percent = get_numbers(item.cssselect('div.per')[0].text_content())[0]
+	sys.stdout.write(' "' + name + ': votes" GAUGE Number ' + votes)
+	sys.stdout.write(' "' + name + ': percent" GAUGE Percent ' + percent)
+
+print
+

@@ -269,3 +269,25 @@ Python dependencies:
 * json
 * datetime
 
+
+
+polldaddy
+=====
+* Language:  Python
+* Type:      Screen scraper
+* Reference: http://www.polldaddy.com/
+* Usage:
+
+
+    polldaddy poll-id
+
+This processor scrapes a given poll on PollDaddy for vote statistics.
+
+Python dependencies:
+* calendar
+* datetime
+* lxml
+* mechanize
+* optparse
+* time
+
