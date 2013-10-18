@@ -250,7 +250,7 @@ exports some statistics about the issues on that Agile board.
 
 
 jira-filter
-==========
+===========
 * Language:  Python
 * Type:      API
 * Reference: http://www.atlassian.com/software/bamboo
@@ -272,7 +272,7 @@ Python dependencies:
 
 
 polldaddy
-=====
+=========
 * Language:  Python
 * Type:      Screen scraper
 * Reference: http://www.polldaddy.com/
