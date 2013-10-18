@@ -1,0 +1,173 @@
+#!/usr/bin/casperjs
+
+var system = require('system');
+var utils = require('utils');
+var fs = require('fs');
+
+// casperjs adds three args to the beginning
+if(system.args.length != 6) {
+	this.echo('usage: honeywell-thermonstat username password');
+	phantom.exit(1);
+}
+
+var username = system.args[4];
+var password = system.args[5];
+
+var casper = require('casper').create();
+casper.userAgent('Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31');
+
+// This is some debug code that prints remote (in-page) log statements to the local console.
+/*casper.on('remote.message', function onRemoteMessage(msg) {
+	this.echo('+++ ' + msg);
+});*/
+
+// looks like we need to do this part to force the onLoad javascript to run?...
+function _javascriptOnLoad() {
+	$(document).on('site:loaded', function() {
+		window.siteLoaded = true;
+	});
+	return true;
+}
+
+function javascriptOnLoad() {
+	this.evaluateOrDie(_javascriptOnLoad);
+}
+
+function javascriptLoadedCheck() {
+	return this.evaluate(function _javascriptLoadedCheck() {
+		return window.siteLoaded === true;
+	}) === true;
+}
+
+var timestamp = Math.round(new Date().getTime() / 1000);
+
+casper.start('https://rs.alarmnet.com/TotalConnectComfort/', javascriptOnLoad);
+
+casper.then(function login() {
+	this.fill('div#login > div > div > form', {
+		'UserName' : username,
+		'Password' : password
+	}, true);
+});
+
+casper.thenOpen('https://rs.alarmnet.com/TotalConnectComfort/Locations', javascriptOnLoad);
+
+var locations = null;
+casper.then(function scrapeLocationList() {
+	locations = JSON.parse(JSON.stringify(this.evaluate(function _scrapeLocationList() {
+		var re = {
+			'trim' : new RegExp('^\s*|\s*$', 'g')
+		};
+
+		var locations = [];
+		var rows = document.querySelectorAll('div#location-list > table > tbody > tr:not(.separator)');
+
+		for(var i = 0; i < rows.length; i++) {
+			var row = rows[i];
+			var td_type = row.querySelector('td.location-type');
+			var td_name = row.querySelector('td.location-zone-title > div.location-zone-title-padding-wrapper > div.location-name');
+			var td_url = row.querySelector('td.zone > div.viewthermostats > a');
+
+			var location = {
+				'type'        : td_type.querySelector('img').getAttribute('alt'),
+				'name'        : td_name.innerText.replace(re.trim, ''),
+				'url'         : 'https://rs.alarmnet.com' + td_url.getAttribute('href'),
+				'thermostats' : []
+			};
+			locations.push(location);
+		}
+
+		return locations;
+	})));
+});
+
+casper.then(function scrapeLocationDetails() {
+	for(var i = 0; i < locations.length; i++) {
+		casper.thenOpen(locations[i].url, javascriptOnLoad);
+		casper.then(function scrapeThermostatData() {
+			for(var i = 0; i < locations.length; i++) {
+				if(locations[i].url = this.getCurrentUrl()) {
+					locations[i].thermostats = JSON.parse(JSON.stringify(this.evaluate(function _scrapeThermostatData() {
+						var re = {
+							'trim' : new RegExp('^\s*|\s*$', 'g')
+						};
+
+						var thermostats = [];
+						var rows = document.querySelectorAll('div#zone-list > table > tbody > tr:not(.separator)');
+
+						for(var i = 0; i < rows.length; i++) {
+							var row = rows[i];
+							var thermostat = {
+								'name'  : row.querySelector('td.location-zone-title > div.location-name').innerText.replace(re.trim, ''),
+								'url'   : 'https://rs.alarmnet.com' + row.querySelectorAll('td.zone > div.zonebutton > a')[1].getAttribute('href'),
+								'stats' : []
+							};
+							thermostats.push(thermostat);
+						}
+
+						return thermostats;
+					})));
+					break;
+				}
+			}
+		});
+	}
+
+	casper.then(function scrapeThermostatDetails() {
+		for(var i = 0; i < locations.length; i++) {
+			for(var j = 0; j < locations[i].thermostats.length; j++) {
+				casper.thenOpen(locations[i].thermostats[j].url, javascriptOnLoad);
+				casper.then(function scrapeData() {
+					for(var i = 0; i < locations.length; i++) {
+						for(var j = 0; j < locations[i].thermostats.length; j++) {
+							if(locations[i].thermostats[j].url == this.getCurrentUrl()) {
+								locations[i].thermostats[j].stats = JSON.parse(JSON.stringify(this.evaluate(function _scrapeData() {
+									var re = {
+										'trim' : new RegExp('^\s*|\s*$', 'g')
+									};
+
+									var container = document.querySelector('div#ControlScreen');
+
+									var systemButtons = container.querySelector('div#SystemButtons');
+									var indoorDisplay = container.querySelector('div#TempDisplays > div#IndoorDisplay');
+									var outdoorDisplay = container.querySelector('div#TempDisplays > div#OutdoorDisplay');
+									var scheduleStatus = container.querySelector('div#ScheduledStatus > div#ScheduledStatusHdr');
+									var fanButtons = container.querySelector('div#FanSystemButtons');
+
+									var stats = {
+										'state_heat'    : $(systemButtons.querySelector('div#HeatBtn')).hasClass('SystemButtonOn') ? 1 : 0,
+										'state_cool'    : $(systemButtons.querySelector('div#CoolBtn')).hasClass('SystemButtonOn') ? 1 : 0,
+										'state_off'     : $(systemButtons.querySelector('div#OffBtn')).hasClass('SystemButtonOn') ? 1 : 0,
+										'state_emheat'  : $(systemButtons.querySelector('div#EMHeatBtn')).hasClass('SystemButtonOn') ? 1 : 0,
+										'indoor_temp'   : indoorDisplay.querySelector('div.IndoorTemp > div.IndoorTempDisplay > div.DisplayValue').innerText.replace(re.trim, ''),
+										'indoor_humid'  : indoorDisplay.querySelector('div.IndoorHumidity > div.IndoorHumidityDisplay > div.DisplayValue').innerText.replace(re.trim, ''),
+										'outdoor_temp'  : outdoorDisplay.querySelector('div.OutdoorTempDisplay > div.DisplayValue').innerText.replace(re.trim, ''),
+										'outdoor_humid' : outdoorDisplay.querySelector('div.OutdoorHumidityDisplay > div.DisplayValue').innerText.replace(re.trim, ''),
+										'sched_status'  : scheduleStatus.innerText.replace(re.trim, '') == 'Following Schedule' ? 1 : 0,
+										'fan_on'        : $(fanButtons.querySelector('div#FanOnBtn')).hasClass('FanSystemButtonOn') ? 1 : 0,
+										'fan_auto'      : $(fanButtons.querySelector('div#FanAutoBtn')).hasClass('FanSystemButtonOn') ? 1 : 0,
+										'fan_circulate' : $(fanButtons.querySelector('div#FanCirculateBtn')).hasClass('FanSystemButtonOn') ? 1 : 0,
+										'fan_scheudle'  : $(fanButtons.querySelector('div#FanFollowScheduleBtn')).hasClass('FanSystemButtonOn') ? 1 : 0
+									};
+
+									return stats;
+								})));
+							}
+						}
+					}
+				});
+			}
+		}
+	});
+});
+
+casper.run(function exitHappy() {
+	for(var i = 0; i < locations.length; i++) {
+		for(var j = 0; j < locations[i].thermostats.length; j++) {
+			var stat = locations[i].thermostats[j].stats;
+			this.echo(timestamp + ' "' + locations[i].name + ' - ' + locations[i].thermostats[j].name + '" "Honeywell thermostat" "Thermostat data" "System heating?" GAUGE Number ' + stat.state_heat + ' "System cooling?" GAUGE Number ' + stat.state_cool + ' "System off?" GAUGE Number ' + stat.state_off + ' "System emergency heating?" GAUGE Number ' + stat.state_emheat + ' "Indoor temperature" GAUGE "Degrees F" ' + stat.indoor_temp + ' "Indoor humidity" GAUGE Percent ' + stat.indoor_humid + ' "Outdoor temperature" GAUGE "Degrees F" ' + stat.outdoor_temp + ' "Outdoor humidity" GAUGE Percent ' + stat.outdoor_humid + ' "Following schedule?" GAUGE Number ' + stat.sched_status + ' "Fan on?" GAUGE Number ' + stat.fan_on + ' "Fan auto?" GAUGE Number ' + stat.fan_auto + ' "Fan circulate?" GAUGE Number ' + stat.fan_circulate + ' "Fan following schedule?" GAUGE Number ' + 1);
+		}
+	}
+	phantom.exit(0);
+});
+

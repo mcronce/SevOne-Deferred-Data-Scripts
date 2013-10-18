@@ -291,3 +291,19 @@ Python dependencies:
 * optparse
 * time
 
+
+
+honeywell-thermostat
+====================
+* Language:  CasperJS
+* Type:      Screen scraper
+* Reference: http://www.mytotalconnectcomfort.com/
+* Usage:
+
+
+    honeywell-thermostat email password
+
+This processor logs into Honeywell's "My Total Connect Comfort" site and reads
+data from your thermostats.  Each thermostat is an object, with several
+indicators about the indoor/outdoor state and state of the system.
+
