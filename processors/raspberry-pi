@@ -34,9 +34,9 @@ echo -n "'SDRAM-p voltage' GAUGE Volts '$(ssh -S "${SOCKET}" -q "$IP" "${path}/v
 echo -n "'System RAM' GAUGE Megabytes '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd get_mem arm" | sed 's/^.*=\([0-9]\+\).*$/\1/')' ";
 echo -n "'Graphics RAM' GAUGE Megabytes '$(ssh -S "${SOCKET}" -q "$IP" "${path}/vcgencmd get_mem gpu" | sed 's/^.*=\([0-9]\+\).*$/\1/')' ";
 load_averages="$(ssh -S "${SOCKET}" -q "$IP" 'uptime' | sed 's/^.*load average: \([0-9.]\+\), \([0-9.]\+\), \([0-9.]\+\).*$/\1,\2,\3/') ";
-echo -n "'1-minute load average' GAUGE Number $(echo "$load_averages" | sed 's/^\(.*\),.*,.*$/\1/') ";
-echo -n "'5-minute load average' GAUGE Number $(echo "$load_averages" | sed 's/^.*,\(.*\),.*$/\1/') ";
-echo -n "'15-minute load average' GAUGE Number $(echo "$load_averages" | sed 's/^.*,.*,\(.*\)$/\1/') ";
+echo -n "'1-minute load average' GAUGE Number '$(echo "$load_averages" | sed 's/^\(.*\),.*,.*$/\1/')' ";
+echo -n "'5-minute load average' GAUGE Number '$(echo "$load_averages" | sed 's/^.*,\(.*\),.*$/\1/')' ";
+echo -n "'15-minute load average' GAUGE Number '$(echo "$load_averages" | sed 's/^.*,.*,\(.*\)$/\1/')' ";
 echo;
 
 ssh -S "${SOCKET}" -O exit "$1" >/dev/null 2>&1;
