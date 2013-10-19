@@ -154,16 +154,24 @@ function split_data_line($line) { // {{{
 
 function parse_data_line($line) { // {{{
 	$items = split_data_line($line);
+	$original_time = $items[0];
+
 	$output = array(
-		'time' => $items[0],
+		'time' => is_numeric($original_time) ? $original_time : @strtotime($original_time),
 		'object_name' => $items[1],
 		'object_type' => $items[2],
 		'object_description' => $items[3],
 		'indicators' => array()
 	);
-	if(!is_numeric($output['time'])) {
-		$output['time'] = @strtotime($output['time']);
+
+	if($output['time'] === false) {
+		echo '!!! Data row for object "', $output['object_name'], '" had invalid time "', $original_time, '"', PHP_EOL;
+		return false;
+	} elseif(count($items) % 4 != 0) {
+		echo '!!! Data row for object "', $output['object_name'], '" at time "', $original_time, '" had an invalid number of arguments (', count($items), ')', PHP_EOL;
+		return false;
 	}
+
 	for($i = 4; $i + 2 < count($items); $i += 4) {
 		$output['indicators'][] = array(
 			'name' => $items[$i],
@@ -172,6 +180,14 @@ function parse_data_line($line) { // {{{
 			'value' => $items[$i + 3]
 		);
 	}
+
+	foreach($output['indicators'] as $i => $indicator) {
+		if(!in_array($indicator['type'], array('GAUGE', 'COUNTER32', 'COUNTER64'))) {
+			echo '!!! Indicator number ', $i, ' for object "', $output['object_name'], '" at time "', $original_time, '" had invalid format "', $indicator['type'], '"', PHP_EOL;
+			return false;
+		}
+	}
+
 	return $output;
 /* }}} */ }
 
@@ -339,6 +355,9 @@ function report_stats($deviceId, $time, $objectType, $objectName, $objectDescrip
 $in = fopen('php://stdin', 'r');
 while($line = fgets($in)) {
 	$parseyBits = parse_data_line($line);
+	if($parseyBits === false) {
+		continue;
+	}
 
 	//report the data
 	try {
