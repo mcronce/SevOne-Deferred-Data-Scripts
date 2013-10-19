@@ -352,6 +352,7 @@ while($line = fgets($in)) {
 
 foreach($dataQueue as $objectId => $queue) {
 	if(is_object($queue) && count($queue->time) > 0) {
+		echo '--- Inserting ', count($queue->time), ' leftover rows for Object ID# ', $objectId, PHP_EOL;
 		insert_from_queue($device->id, $objectId, $dataQueue);
 	}
 }
