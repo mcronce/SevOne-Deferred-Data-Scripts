@@ -117,8 +117,54 @@ sys.stdout.write(' "Forum posts per day" GAUGE Number ' + stats['posts_per_day']
 # Find the main panel
 (main_panel,) = big_container.cssselect('div.profile-container > div.container-inner > div.container-content > div.profile-boxes')
 
+# Get achievement/challenge data {{{
+(achievement_box,) = main_panel.cssselect('div.profile-box.achievements > div.box-inner')
+(challenge_div, achievement_div) = achievement_box.cssselect('div.info')
+
+stats = {
+	'challenges_completed' : '0',
+	'challenges_available' : '0',
+	'achievements_completed' : '0',
+	'achievements_available' : '0'
+}
+
+(stats['challenges_completed'], stats['challenges_available']) = get_numbers(get_stripped_text(challenge_div))
+(stats['achievements_completed'], stats['achievements_available']) = get_numbers(get_stripped_text(achievement_div))
+
+sys.stdout.write(' "Challenges completed" GAUGE Number ' + stats['challenges_completed'])
+sys.stdout.write(' "Challenges available" GAUGE Number ' + stats['challenges_available'])
+sys.stdout.write(' "Achievements completed" GAUGE Number ' + stats['achievements_completed'])
+sys.stdout.write(' "Achievements available" GAUGE Number ' + stats['achievements_available'])
+# }}}
+
+# Get season/event data {{{
+(seasons_box,) = main_panel.cssselect('div.profile-box.seasons > div.box-inner')
+(lifetime_points, current_points, current_rank, current_rewards) = seasons_box.cssselect('div.info')
+
+stats = {
+	'lifetime_points' : '0',
+	'current_points' : '0',
+	'current_rank' : '0',
+	'current_rewards' : '0',
+	'current_rewards_max' : '0'
+}
+
+(stats['lifetime_points'],) = get_numbers(get_stripped_text(lifetime_points))
+(stats['current_points'],) = get_numbers(get_stripped_text(current_points))
+(stats['current_rank'],) = get_numbers(get_stripped_text(current_rank))
+(stats['current_rewards'], stats['current_rewards_max']) = get_numbers(get_stripped_text(current_rewards))
+
+sys.stdout.write(' "Lifetime season points" GAUGE Number ' + stats['lifetime_points'])
+sys.stdout.write(' "Current season points" GAUGE Number ' + stats['current_points'])
+sys.stdout.write(' "Current season rank" GAUGE Number ' + stats['current_rank'])
+sys.stdout.write(' "Current season rewards" GAUGE Number ' + stats['current_rewards'])
+sys.stdout.write(' "Maximum current season rewards" GAUGE Number ' + stats['current_rewards_max'])
+# }}}
+
 # Get characters {{{
-(character_box,) = main_panel.cssselect('div.profile-box.characters > div.box-inner')
+response = br.open('https://www.pathofexile.com/account/view-profile/' + account_name + '/characters')
+page = lxml.html.fromstring(response.read())
+(character_box,) = page.cssselect('div#mainContainer > div.layoutBox1 > div.layoutBoxContent > div.profile > div.profile-container > div.container-inner > div.container-content')
 character_divs = character_box.cssselect('div.profile-character')
 
 stats = {
@@ -167,10 +213,10 @@ for div in character_divs:
 	stats['classes'][cls] = stats['classes'][cls] + 1
 	stats['leagues'][league] = stats['leagues'][league] + 1
 	try:
-		div.attrib['class'].split().index('non-hardcore')
-		stats['hardcore']['false'] = stats['hardcore']['false'] + 1
-	except e:
+		div.attrib['class'].split().index('hardcore')
 		stats['hardcore']['true'] = stats['hardcore']['true'] + 1
+	except:
+		stats['hardcore']['false'] = stats['hardcore']['false'] + 1
 
 stats['level']['average'] = float(stats['level']['total']) / float(stats['total'])
 
@@ -185,50 +231,6 @@ sys.stdout.write(' "Minimum character level" GAUGE Number ' + str(stats['level']
 sys.stdout.write(' "Maximum character level" GAUGE Number ' + str(stats['level']['max']))
 for league in stats['leagues']:
 	sys.stdout.write(' "Characters in ' + league.capitalize() + ' league" GAUGE Number ' + str(stats['leagues'][league]))
-# }}}
-
-# Get achievement/challenge data {{{
-(achievement_box,) = main_panel.cssselect('div.profile-box.achievements > div.box-inner')
-(challenge_div, achievement_div) = achievement_box.cssselect('div.info')
-
-stats = {
-	'challenges_completed' : '0',
-	'challenges_available' : '0',
-	'achievements_completed' : '0',
-	'achievements_available' : '0'
-}
-
-(stats['challenges_completed'], stats['challenges_available']) = get_numbers(get_stripped_text(challenge_div))
-(stats['achievements_completed'], stats['achievements_available']) = get_numbers(get_stripped_text(achievement_div))
-
-sys.stdout.write(' "Challenges completed" GAUGE Number ' + stats['challenges_completed'])
-sys.stdout.write(' "Challenges available" GAUGE Number ' + stats['challenges_available'])
-sys.stdout.write(' "Achievements completed" GAUGE Number ' + stats['achievements_completed'])
-sys.stdout.write(' "Achievements available" GAUGE Number ' + stats['achievements_available'])
-# }}}
-
-# Get season/event data {{{
-(seasons_box,) = main_panel.cssselect('div.profile-box.seasons > div.box-inner')
-(lifetime_points, current_points, current_rank, current_rewards) = seasons_box.cssselect('div.info')
-
-stats = {
-	'lifetime_points' : '0',
-	'current_points' : '0',
-	'current_rank' : '0',
-	'current_rewards' : '0',
-	'current_rewards_max' : '0'
-}
-
-(stats['lifetime_points'],) = get_numbers(get_stripped_text(lifetime_points))
-(stats['current_points'],) = get_numbers(get_stripped_text(current_points))
-(stats['current_rank'],) = get_numbers(get_stripped_text(current_rank))
-(stats['current_rewards'], stats['current_rewards_max']) = get_numbers(get_stripped_text(current_rewards))
-
-sys.stdout.write(' "Lifetime season points" GAUGE Number ' + stats['lifetime_points'])
-sys.stdout.write(' "Current season points" GAUGE Number ' + stats['current_points'])
-sys.stdout.write(' "Current season rank" GAUGE Number ' + stats['current_rank'])
-sys.stdout.write(' "Current season rewards" GAUGE Number ' + stats['current_rewards'])
-sys.stdout.write(' "Maximum current season rewards" GAUGE Number ' + stats['current_rewards_max'])
 # }}}
 
 # Trailing newline!
