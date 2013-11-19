@@ -167,6 +167,7 @@ page = lxml.html.fromstring(response.read())
 (character_box,) = page.cssselect('div#mainContainer > div.layoutBox1 > div.layoutBoxContent > div.profile > div.profile-container > div.container-inner > div.container-content')
 character_divs = character_box.cssselect('div.profile-character')
 
+characters = []
 stats = {
 	'total' : 0,
 	'classes' : {
@@ -197,15 +198,30 @@ stats = {
 }
 
 for div in character_divs:
+	character = {
+		'name' : '',
+		'class' : '',
+		'league' : '',
+		'hardcore' : 0,
+		'level' : 0
+	}
+
 	info_divs = div.cssselect('div.info')
 	stats['total'] = stats['total'] + 1
+	character['name'] = get_stripped_text(info_divs[0].cssselect('span')[0])
 
 	match = regex_level_class.match(info_divs[1].text)
-	level = int(match.group(1))
-	cls = match.group(2).lower()
+	level = match.group(1)
+	cls = match.group(2)
+	character['level'] = level
+	character['class'] = cls
+	level = int(level)
+	cls = cls.lower()
 
 	match = regex_league.match(info_divs[2].text)
-	league = match.group(1).lower()
+	league = match.group(1)
+	character['league'] = league
+	league = league.lower()
 
 	stats['level']['total'] = stats['level']['total'] + level
 	if(level > stats['level']['max']):
@@ -217,8 +233,12 @@ for div in character_divs:
 
 	if(league == 'nemesis' or league == 'hardcore'):
 		stats['hardcore']['true'] = stats['hardcore']['true'] + 1
+		character['hardcore'] = '1'
 	else:
 		stats['hardcore']['false'] = stats['hardcore']['false'] + 1
+		character['hardcore'] = '0'
+	
+	characters.append(character)
 
 stats['level']['average'] = float(stats['level']['total']) / float(stats['total'])
 
@@ -237,4 +257,11 @@ for league in stats['leagues']:
 
 # Trailing newline!
 sys.stdout.write("\n")
+
+# OK, print characters
+for char in characters:
+	sys.stdout.write(str(timestamp) + ' "' + account_name + '\'s character: ' + char['name'] + '" "Path of Exile character stats" "' + char['class'] + ' in ' + char['league'] + '"')
+	sys.stdout.write(' "Hardcore" GAUGE Number ' + char['hardcore'])
+	sys.stdout.write(' "Level" GAUGE Number ' + char['level'])
+	sys.stdout.write("\n")
 
