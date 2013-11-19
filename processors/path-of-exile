@@ -190,7 +190,9 @@ stats = {
 	},
 	'leagues' : {
 		'domination' : 0,
-		'nemesis' : 0
+		'hardcore' : 0,
+		'nemesis' : 0,
+		'standard' : 0
 	}
 }
 
@@ -212,10 +214,10 @@ for div in character_divs:
 		stats['level']['min'] = level
 	stats['classes'][cls] = stats['classes'][cls] + 1
 	stats['leagues'][league] = stats['leagues'][league] + 1
-	try:
-		div.attrib['class'].split().index('hardcore')
+
+	if(league == 'nemesis' or league == 'hardcore'):
 		stats['hardcore']['true'] = stats['hardcore']['true'] + 1
-	except:
+	else:
 		stats['hardcore']['false'] = stats['hardcore']['false'] + 1
 
 stats['level']['average'] = float(stats['level']['total']) / float(stats['total'])
