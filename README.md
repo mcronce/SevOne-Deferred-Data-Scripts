@@ -307,3 +307,18 @@ This processor logs into Honeywell's "My Total Connect Comfort" site and reads
 data from your thermostats.  Each thermostat is an object, with several
 indicators about the indoor/outdoor state and state of the system.
 
+
+
+path-of-exile
+=============
+* Language:  Python
+* Type:      Screen scraper
+* Reference: http://www.pathofexile.com/
+* Usage:
+
+
+    path-of-exile Account_Name
+
+This processor scrapes a player's account data for a free-to-play game called
+Path of Exile.
+

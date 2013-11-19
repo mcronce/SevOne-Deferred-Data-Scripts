@@ -1,0 +1,236 @@
+#!/usr/bin/python2
+import calendar
+import lxml.etree
+import lxml.html
+import mechanize
+import re
+import sys
+import time
+from datetime import datetime
+from optparse import OptionParser
+
+# Constants {{{
+regex_number = re.compile('-?[0-9,.]+')
+regex_level_class = re.compile('^\s*Level\s*([0-9]+)\s*([A-Za-z]+)\s*$')
+regex_league = re.compile('^\s*([A-Za-z]+)\s*League\s*$')
+regex_achievements_challenges = re.compile('^\s*[A-Za-z]+\s*completed:\s*([0-9]+)/([0-9]+)\s*$')
+# }}}
+
+def get_stripped_text(elem): # {{{
+	return str.join('', [text for text in elem.xpath('text()')]).strip()
+# }}}
+
+def get_numbers(string): # {{{
+	numbers = regex_number.findall(string)
+	if(len(numbers) == 0):
+		return ['NULL']
+	
+	for i in xrange(len(numbers)):
+		numbers[i] = numbers[i].replace(',', '')
+	
+	return numbers
+# }}}
+
+def secs_to_mins(numbers): # {{{
+	return str((int(numbers[0]) + (int(numbers[1]) / 60.0)))
+# }}}
+
+def str2timestamp(date_string): # {{{
+	return int(time.mktime(time.strptime(date_string, '%B %d, %Y')))
+# }}}
+
+# Parse command-line arguments {{{
+cmdline = OptionParser(usage = 'usage: %prog Account_Name')
+
+(options, args) = cmdline.parse_args()
+if(len(args) != 1):
+	cmdline.print_help()
+	sys.exit(1)
+
+(account_name,) = args
+# }}}
+
+# Browser setup {{{
+# Initialize the browser
+br = mechanize.Browser()
+
+# Enable some handlers
+br.set_handle_equiv(True)
+#br.set_handle_gzip(True)
+br.set_handle_redirect(True)
+br.set_handle_referer(True)
+br.set_handle_robots(False)
+
+# Don't hang on >0 refresh times
+br.set_handle_refresh(mechanize._http.HTTPRefreshProcessor(), max_time = 1)
+
+# Lie, cheat, and steal
+br.addheaders = [('User-agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31 AlexaToolbar/alxg-3.1')]
+# }}}
+
+# write down the timestamp
+timestamp = int(time.mktime(datetime.now().timetuple()))
+
+# Throw down our whole account timestamp/object information
+sys.stdout.write(str(timestamp) + ' "Path of Exile account statistics for ' + account_name + '" "Path of Exile account statistics" "' + account_name + '\'s account statistics"')
+
+# Retrieve the page, parse into an XML document, and find the root of the stuff we care about
+response = br.open('https://www.pathofexile.com/account/view-profile/' + account_name)
+page = lxml.html.fromstring(response.read())
+(big_container,) = page.cssselect('html > body > div#siteContainer > div#siteCentered > div#mainContainer > div.layoutBox1.layoutBoxFull > div.layoutBoxContent > div.profile')
+
+# Get the stats from the right-hand sidebar {{{
+(right_bar,) = big_container.cssselect('div.profile-details > div.details-inner > div.details-content > div.details')
+
+paragraphs = right_bar.cssselect('p')
+stats = {
+	'guild' : 0,
+	'joined' : 0,
+	'last_visited' : 0,
+	'total_posts' : 0,
+	'posts_per_day' : 0
+}
+
+for p in paragraphs:
+	strong = p.cssselect('strong')
+	if(len(strong) == 0):
+		continue
+	
+	strong = strong[0]
+	if(strong.text == 'Guild:'):
+		stats['guild'] = 1
+	elif(strong.text == 'Joined:'):
+		stats['joined'] = timestamp - str2timestamp(get_stripped_text(p))
+	elif(strong.text == 'Last Visited:'):
+		stats['last_visited'] = timestamp - str2timestamp(get_stripped_text(p))
+	elif(strong.text == 'Total Forum Posts:'):
+		stats['total_posts'] = get_stripped_text(p)
+		stats['posts_per_day'] = get_numbers(get_stripped_text(p.cssselect('small')[0]))[0]
+
+sys.stdout.write(' "In guild?" GAUGE Number ' + str(stats['guild']))
+sys.stdout.write(' "Time since joining" GAUGE Seconds ' + str(stats['joined']))
+sys.stdout.write(' "Time since last visit" GAUGE Seconds ' + str(stats['last_visited']))
+sys.stdout.write(' "Total forum posts" GAUGE Number ' + stats['total_posts'])
+sys.stdout.write(' "Forum posts per day" GAUGE Number ' + stats['posts_per_day'])
+# }}}
+	
+# Find the main panel
+(main_panel,) = big_container.cssselect('div.profile-container > div.container-inner > div.container-content > div.profile-boxes')
+
+# Get characters {{{
+(character_box,) = main_panel.cssselect('div.profile-box.characters > div.box-inner')
+character_divs = character_box.cssselect('div.profile-character')
+
+stats = {
+	'total' : 0,
+	'classes' : {
+		'marauder' : 0,
+		'ranger' : 0,
+		'witch' : 0,
+		'duelist' : 0,
+		'templar' : 0,
+		'shadow' : 0,
+		'scion' : 0
+	},
+	'hardcore' : {
+		'true' : 0,
+		'false' : 0
+	},
+	'level' : {
+		'total' : 0,
+		'average' : 0,
+		'min' : 9999,
+		'max' : 0
+	},
+	'leagues' : {
+		'domination' : 0,
+		'nemesis' : 0
+	}
+}
+
+for div in character_divs:
+	info_divs = div.cssselect('div.info')
+	stats['total'] = stats['total'] + 1
+
+	match = regex_level_class.match(info_divs[1].text)
+	level = int(match.group(1))
+	cls = match.group(2).lower()
+
+	match = regex_league.match(info_divs[2].text)
+	league = match.group(1).lower()
+
+	stats['level']['total'] = stats['level']['total'] + level
+	if(level > stats['level']['max']):
+		stats['level']['max'] = level
+	if(level < stats['level']['min']):
+		stats['level']['min'] = level
+	stats['classes'][cls] = stats['classes'][cls] + 1
+	stats['leagues'][league] = stats['leagues'][league] + 1
+	try:
+		div.attrib['class'].split().index('non-hardcore')
+		stats['hardcore']['false'] = stats['hardcore']['false'] + 1
+	except e:
+		stats['hardcore']['true'] = stats['hardcore']['true'] + 1
+
+stats['level']['average'] = float(stats['level']['total']) / float(stats['total'])
+
+sys.stdout.write(' "Total characters" GAUGE Number ' + str(stats['total']))
+for cls in stats['classes']:
+	sys.stdout.write(' "' + cls.capitalize() + ' characters" GAUGE Number ' + str(stats['classes'][cls]))
+sys.stdout.write(' "Hardcore characters" GAUGE Number ' + str(stats['hardcore']['true']))
+sys.stdout.write(' "Non-hardcore characters" GAUGE Number ' + str(stats['hardcore']['false']))
+sys.stdout.write(' "Total of character levels" GAUGE Number ' + str(stats['level']['total']))
+sys.stdout.write(' "Average character level" GAUGE Number ' + str(stats['level']['average']))
+sys.stdout.write(' "Minimum character level" GAUGE Number ' + str(stats['level']['min']))
+sys.stdout.write(' "Maximum character level" GAUGE Number ' + str(stats['level']['max']))
+for league in stats['leagues']:
+	sys.stdout.write(' "Characters in ' + league.capitalize() + ' league" GAUGE Number ' + str(stats['leagues'][league]))
+# }}}
+
+# Get achievement/challenge data {{{
+(achievement_box,) = main_panel.cssselect('div.profile-box.achievements > div.box-inner')
+(challenge_div, achievement_div) = achievement_box.cssselect('div.info')
+
+stats = {
+	'challenges_completed' : '0',
+	'challenges_available' : '0',
+	'achievements_completed' : '0',
+	'achievements_available' : '0'
+}
+
+(stats['challenges_completed'], stats['challenges_available']) = get_numbers(get_stripped_text(challenge_div))
+(stats['achievements_completed'], stats['achievements_available']) = get_numbers(get_stripped_text(achievement_div))
+
+sys.stdout.write(' "Challenges completed" GAUGE Number ' + stats['challenges_completed'])
+sys.stdout.write(' "Challenges available" GAUGE Number ' + stats['challenges_available'])
+sys.stdout.write(' "Achievements completed" GAUGE Number ' + stats['achievements_completed'])
+sys.stdout.write(' "Achievements available" GAUGE Number ' + stats['achievements_available'])
+# }}}
+
+# Get season/event data {{{
+(seasons_box,) = main_panel.cssselect('div.profile-box.seasons > div.box-inner')
+(lifetime_points, current_points, current_rank, current_rewards) = seasons_box.cssselect('div.info')
+
+stats = {
+	'lifetime_points' : '0',
+	'current_points' : '0',
+	'current_rank' : '0',
+	'current_rewards' : '0',
+	'current_rewards_max' : '0'
+}
+
+(stats['lifetime_points'],) = get_numbers(get_stripped_text(lifetime_points))
+(stats['current_points'],) = get_numbers(get_stripped_text(current_points))
+(stats['current_rank'],) = get_numbers(get_stripped_text(current_rank))
+(stats['current_rewards'], stats['current_rewards_max']) = get_numbers(get_stripped_text(current_rewards))
+
+sys.stdout.write(' "Lifetime season points" GAUGE Number ' + stats['lifetime_points'])
+sys.stdout.write(' "Current season points" GAUGE Number ' + stats['current_points'])
+sys.stdout.write(' "Current season rank" GAUGE Number ' + stats['current_rank'])
+sys.stdout.write(' "Current season rewards" GAUGE Number ' + stats['current_rewards'])
+sys.stdout.write(' "Maximum current season rewards" GAUGE Number ' + stats['current_rewards_max'])
+# }}}
+
+# Trailing newline!
+sys.stdout.write("\n")
+
