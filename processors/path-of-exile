@@ -236,7 +236,7 @@ for div in character_divs:
 	stats['classes'][cls] = stats['classes'][cls] + 1
 	stats['leagues'][league] = stats['leagues'][league] + 1
 
-	if(league == 'nemesis' or league == 'hardcore'):
+	if(league == 'nemesis' or league == 'hardcore' or league == 'race'):
 		stats['hardcore']['true'] = stats['hardcore']['true'] + 1
 		character['hardcore'] = '1'
 	else:
