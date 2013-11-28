@@ -194,7 +194,8 @@ stats = {
 		'hardcore' : 0,
 		'nemesis' : 0,
 		'race' : 0,
-		'standard' : 0
+		'standard' : 0,
+		'void' : 0
 	}
 }
 
