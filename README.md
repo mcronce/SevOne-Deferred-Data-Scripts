@@ -322,3 +322,19 @@ path-of-exile
 This processor scrapes a player's account data for a free-to-play game called
 Path of Exile.
 
+
+
+linux-disk
+==========
+* Language:  bash
+* Type:      System poller
+* Usage:
+
+
+    linux-disk
+
+This processor uses `df` and `mount` to scrape usage data about the mounted
+filesystems on a Linux machine.  SNMP would normally be used for this, but if
+SNMP is impossible, this utility will provide an easy workaround.  This may
+work with other flavors of Unix, but is untested.
+

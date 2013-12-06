@@ -1,0 +1,8 @@
+#!/usr/bin/bash
+
+ts="$(date +%s)";
+df -l | tail -n +2 | while read dev total used available percent mountpoint; do
+	fstype="$(mount | grep " on ${mountpoint} type " | sed 's:^.\+\s\+on\s\+/.*\s\+type\s\+\(.\+\)\s\+(.*$:\1:')";
+	echo "${ts} '${mountpoint} (${fstype})' 'Unix filesystem' '${dev}' 'Total size' GAUGE Bytes '$(($total * 1024))' 'Used space' GAUGE Bytes '$(($used * 1024))' 'Available space' GAUGE Bytes '$(($available * 1024))' 'Percent full' GAUGE Percent '$(echo -e "scale=5\n(${used} / ${total}) * 100" | bc -q)'";
+done;
+
