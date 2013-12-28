@@ -338,3 +338,26 @@ filesystems on a Linux machine.  SNMP would normally be used for this, but if
 SNMP is impossible, this utility will provide an easy workaround.  This may
 work with other flavors of Unix, but is untested.
 
+
+
+killing-floor
+=============
+* Language:  Python
+* Type:      Screen scraper
+* Reference: http://www.killingfloorthegame.com/
+* Usage:
+
+
+    killing-floor server.hostname.or.ip Admin_username Admin_password
+
+This processor scrapes the webadmin interface for a Killing Floor server and
+retrieves server/player statistics
+
+Python dependencies:
+* calendar
+* datetime
+* lxml
+* mechanize
+* optparse
+* time
+

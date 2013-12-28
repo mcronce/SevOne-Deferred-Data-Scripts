@@ -1,0 +1,124 @@
+#!/usr/bin/python2
+import calendar
+import lxml.html
+import mechanize
+import re
+import sys
+import time
+from datetime import datetime
+from optparse import OptionParser
+
+# Constants {{{
+regex_number = re.compile('-?[0-9,.]+')
+regex_time = re.compile('([0-9]+):([0-9]+):?([0-9]+)?')
+regex_server_name = re.compile('^(.+) - Killing Floor - Web Admin$')
+# }}}
+
+def get_numbers(string): # {{{
+	numbers = regex_number.findall(string)
+	if(len(numbers) == 0):
+		return ['NULL']
+	
+	for i in xrange(len(numbers)):
+		numbers[i] = numbers[i].replace(',', '')
+	
+	return numbers
+# }}}
+
+def secs_to_mins(numbers): # {{{
+	return str((int(numbers[0]) + (int(numbers[1]) / 60.0)))
+# }}}
+
+# Parse command-line arguments {{{
+cmdline = OptionParser(usage = 'usage: %prog hostname.or.ip:port username password')
+
+(options, args) = cmdline.parse_args()
+if(len(args) != 3):
+	cmdline.print_help()
+	sys.exit(1)
+
+(url,username,password,) = args
+url = 'http://' + url + '/'
+# }}}
+
+# Browser setup {{{
+# Initialize the browser
+br = mechanize.Browser()
+
+# Enable some handlers
+br.set_handle_equiv(True)
+#br.set_handle_gzip(True)
+br.set_handle_redirect(True)
+br.set_handle_referer(True)
+br.set_handle_robots(False)
+
+# Don't hang on >0 refresh times
+br.set_handle_refresh(mechanize._http.HTTPRefreshProcessor(), max_time = 1)
+
+# Authenticate
+br.add_password(url, username, password)
+
+# Lie, cheat, and steal
+br.addheaders = [('User-agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31 AlexaToolbar/alxg-3.1')]
+# }}}
+
+# Retrieve the main page, parse into an XML document, and get the title
+url = url + 'ServerAdmin/'
+response = br.open(url)
+page = lxml.html.fromstring(response.read())
+title = regex_server_name.match(page.cssselect('html > head > title')[0].text.encode('utf-8')).group(1)
+
+# Throw down our timestamp/object information
+timestamp = str(int(time.mktime(datetime.now().timetuple())))
+sys.stdout.write(timestamp + ' "' + title + '" "Killing Floor server" "Killing Floor server"')
+
+# Load the "Current Game" page and grab the number of players
+response = br.open(url + 'current_game')
+page = lxml.html.fromstring(response.read())
+table = page.cssselect('html > body > table > tr > td > form > table > tr > td > table > tr')
+table.pop(0)
+if(len(table) == 0 or len(table[0]) == 1):
+	sys.stdout.write(' "Players" GAUGE Number 0')
+	has_players = False
+else:
+	sys.stdout.write(' "Players" GAUGE Number ' + str(len(table)))
+	has_players = True
+sys.stdout.write("\n")
+
+if(not has_players):
+	sys.exit(0)
+
+players = {}
+# Figure out some per-player stats from this page
+for row in table:
+	cells = row.cssselect('td')
+	name = cells[0].text.encode('utf-8').strip()
+	players[name] = {
+		'Kills' : get_numbers(cells[1].text)[0],
+		'Team kills' : get_numbers(cells[2].text)[0],
+		'Deaths' : get_numbers(cells[3].text)[0],
+		'Suicides' : get_numbers(cells[4].text)[0]
+	}
+
+# Load the "Player List" page and get some other stats
+response = br.open(url + 'current_players')
+page = lxml.html.fromstring(response.read())
+table = page.cssselect('html > body > table > tr > td > form > table > tr')
+table.pop(0)
+table.pop(0)
+for row in table:
+	cells = row.cssselect('td')
+	name = cells[3].text.encode('utf-8').strip()
+	players[name]['Ping'] = get_numbers(cells[5].text)[0]
+	players[name]['Score'] = get_numbers(cells[6].text)[0]
+	players[name]['Global ID'] = get_numbers(cells[9].text)[0]
+
+# OK, loop through all the players and drop some data
+for name in players.iterkeys():
+	player = players[name]
+	gid = player.pop('Global ID')
+	sys.stdout.write(timestamp + ' "' + unicode(name, 'ascii', errors = 'ignore') + '" "Killing Floor player" "Global ID: ' + gid + '"')
+	for key in player.iterkeys():
+		sys.stdout.write(' "' + key + '" GAUGE ' + ('Milliseconds' if key == 'Ping' else 'Number') + ' ' + player[key])
+	sys.stdout.write("\n")
+
