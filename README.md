@@ -322,6 +322,14 @@ path-of-exile
 This processor scrapes a player's account data for a free-to-play game called
 Path of Exile.
 
+Python dependencies:
+* calendar
+* datetime
+* lxml
+* mechanize
+* optparse
+* time
+
 
 
 linux-disk
