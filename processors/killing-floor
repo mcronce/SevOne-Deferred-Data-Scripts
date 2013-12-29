@@ -12,6 +12,7 @@ from optparse import OptionParser
 regex_number = re.compile('-?[0-9,.]+')
 regex_time = re.compile('([0-9]+):([0-9]+):?([0-9]+)?')
 regex_server_name = re.compile('^(.+) - Killing Floor - Web Admin$')
+regex_drop_spectator_tag = re.compile('^(.+)\xc2\xa0\(Spectator\)\xc2\xa0$')
 # }}}
 
 def get_numbers(string): # {{{
@@ -108,7 +109,7 @@ table.pop(0)
 table.pop(0)
 for row in table:
 	cells = row.cssselect('td')
-	name = cells[3].text.encode('utf-8').strip()
+	name = regex_drop_spectator_tag.match(cells[3].text.encode('utf-8').strip()).group(1)
 	players[name]['Ping'] = get_numbers(cells[5].text)[0]
 	players[name]['Score'] = get_numbers(cells[6].text)[0]
 	players[name]['Global ID'] = get_numbers(cells[9].text)[0]
