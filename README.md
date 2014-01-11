@@ -369,3 +369,20 @@ Python dependencies:
 * optparse
 * time
 
+
+
+linux-nvidia
+============
+* Language:  bash
+* Type:      System poller
+* Usage:
+
+
+    linux-nvidia X_Display_ID
+	Ex: linux-nvidia :0.0
+
+This processor uses the `nvidia-settings` CLI utility to scrape data about an
+NVidia graphics card; metadata and utilization statistics alike.  An xAgent
+net-snmp plugin would be nicer for this purpose, but that doesn't seem to
+currently exist.
+

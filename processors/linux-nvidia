@@ -1,0 +1,68 @@
+#!/bin/bash
+
+if [ "$#" -ne 1 ]; then
+	echo "Usage: $0 X_Display_ID";
+	exit 1;
+fi;
+
+get_formatted_perfmodes() {
+	nvidia-settings -q "$1/GPUPerfModes" -t | tr "\n" ' ' | tr ';' '\n' | sed -e 's/,//g' -e 's/^ //' -e 's/ [a-zA-Z]\+\(min\|max\)=[0-9]\+//g' -e 's/^perf=\([0-9]\) nvclock=\([0-9]\+\) memclock=\([0-9]\+\) memTransferRate=\([0-9]\+\) processorclock=\([0-9]\+\)\s*$/\1 \2 \3 \4 \5/' | sort -nk1;
+}
+
+DISPLAY="$1";
+
+nvidia-settings -q gpus | grep 'gpu:' | sed 's/^.*\[\(gpu:[0-9]\+\)\]\s*(\([^)]\+\))\s*$/\1 \2/' | while read friendly_id name; do
+	id="[${friendly_id}]";
+	echo -n "$(date +%s) '${friendly_id}' 'NVidia GPU on Linux' '${name}'";
+	echo -n " 'Driver version' GAUGE Number $(nvidia-settings -q "${id}/NvidiaDriverVersion" -t)";
+	echo -n " 'PCI-Express max link speed' GAUGE Megahertz $(nvidia-settings -q "${id}/PCIEMaxLinkSpeed" -t)";
+	echo -n " 'PCI-Express max link width' GAUGE Bits $(nvidia-settings -q "${id}/PCIEMaxLinkWidth" -t)";
+	echo -n " 'PCI-Express current link speed' GAUGE Megahertz $(nvidia-settings -q "${id}/PCIECurrentLinkSpeed" -t)";
+	echo -n " 'PCI-Express current link width' GAUGE Bits $(nvidia-settings -q "${id}/PCIECurrentLinkWidth" -t)";
+	echo -n " 'Total video RAM' GAUGE Kilobytes $(nvidia-settings -q "${id}/VideoRam" -t)";
+	total_dedicated="$(nvidia-settings -q "${id}/TotalDedicatedGPUMemory" -t)";
+	used_dedicated="$(nvidia-settings -q "${id}/UsedDedicatedGPUMemory" -t)";
+	avail_dedicated="$(($total_dedicated - $used_dedicated))";
+	echo -n " 'Total dedicated memory' GAUGE Megabytes ${total_dedicated}";
+	echo -n " 'Used dedicated memory' GAUGE Megabytes ${used_dedicated}";
+	echo -n " 'Available dedicated memory' GAUGE Megabytes ${avail_dedicated}";
+	echo -n " 'IRQ' GAUGE Number $(nvidia-settings -q "${id}/Irq" -t)";
+	echo -n " 'CUDA cores' GAUGE Number $(nvidia-settings -q "${id}/CUDACores" -t)";
+	echo -n " 'GPU memory interface width' GAUGE Bits $(nvidia-settings -q "${id}/GPUMemoryInterface" -t)";
+	echo -n " 'GPU core temperature' GAUGE 'Degrees C' $(nvidia-settings -q "${id}/GPUCoreTemp" -t)";
+	echo -n " 'Ambient temperature' GAUGE 'Degrees C' $(nvidia-settings -q "${id}/GPUAmbientTemp" -t)";
+	read min_perf min_gclock min_memclock min_memrate min_pclock < <(get_formatted_perfmodes "$id" | head -n1);
+	read max_perf max_gclock max_memclock max_memrate max_pclock < <(get_formatted_perfmodes "$id" | tail -n1);
+	read cur_gclock cur_memclock cur_memrate cur_pclock < <(nvidia-settings -q "[gpu:0]/GPUCurrentClockFreqsString" -t | tr '\n' ' ' | sed -e 's/ [a-zA-Z]\+\(min\|max\)=[0-9]\+//g' -e 's/,//g' -e 's/[a-zA-Z]\+=//g');
+	echo -n " 'Minimum performance level' GAUGE Number ${min_perf}";
+	echo -n " 'Maximum performance level' GAUGE Number ${max_perf}";
+	echo -n " 'Current performance level' GAUGE Number $(nvidia-settings -q "${id}/GPUCurrentPerfLevel" -t)";
+	echo -n " 'Minimum graphics clock' GAUGE Megahertz ${min_gclock}";
+	echo -n " 'Maximum graphics clock' GAUGE Megahertz ${max_gclock}";
+	echo -n " 'Current graphics clock' GAUGE Megahertz ${cur_gclock}";
+	echo -n " 'Minimum dedicated memory clock' GAUGE Megahertz ${min_memclock}";
+	echo -n " 'Maximum dedicated memory clock' GAUGE Megahertz ${max_memclock}";
+	echo -n " 'Current dedicated memory clock' GAUGE Megahertz ${cur_memclock}";
+	echo -n " 'Minimum dedicated memory transfer rate' GAUGE Megahertz ${min_memrate}";
+	echo -n " 'Maximum dedicated memory transfer rate' GAUGE Megahertz ${max_memrate}";
+	echo -n " 'Current dedicated memory transfer rate' GAUGE Megahertz ${cur_memrate}";
+	echo -n " 'Minimum processor clock' GAUGE Megahertz ${min_pclock}";
+	echo -n " 'Maximum processor clock' GAUGE Megahertz ${max_pclock}";
+	echo -n " 'Current processor clock' GAUGE Megahertz ${cur_pclock}";
+	echo -n " 'GPU adaptive clock state' GAUGE Number $(nvidia-settings -q "${id}/GPUAdaptiveClockState" -t)";
+	echo -n " 'GPU fan speed (percent)' GAUGE Percent '$(nvidia-settings -q "${id/gpu/fan}/GPUCurrentFanSpeed" -t)'";
+	echo -n " 'GPU fan speed (RPM)' GAUGE RPM '$(nvidia-settings -q "${id/gpu/fan}/GPUCurrentFanSpeedRPM" -t)'";
+	#echo -n " 'GPU errors' GAUGE Number $(nvidia-settings -q "${id}/GPUErrors" -t)";
+	read gpu_load available_vram video_load pcie_load < <(nvidia-settings -q '[gpu:0]/GPUUtilization' -t | sed -e 's/[a-zA-Z]\+=//g' -e 's/,//g');
+	echo -n " 'GPU utilization' GAUGE Percent ${gpu_load}";
+	echo -n " 'GPU idle' GAUGE Percent $((100 - $gpu_load))";
+	echo -n " 'Video RAM utilization' GAUGE Percent ${available_vram}";
+	echo -n " 'video RAM idle' GAUGE Percent $((100 - $available_vram))";
+	echo -n " 'Video utilization' GAUGE Percent ${video_load}";
+	echo -n " 'Video idle' GAUGE Percent $((100 - $video_load))";
+	echo -n " 'PCI-Express bus utilization' GAUGE Percent ${pcie_load}";
+	echo -n " 'PCI-Express bus idle' GAUGE Percent $((100 - $pcie_load))";
+	echo -n " 'Screen refresh rate' GAUGE Hertz $(nvidia-settings -q "${id}/RefreshRate" -t | head -n1 | sed 's/ Hz//')";
+	echo;
+done;
+
