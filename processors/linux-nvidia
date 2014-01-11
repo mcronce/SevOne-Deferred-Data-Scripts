@@ -9,7 +9,7 @@ get_formatted_perfmodes() {
 	nvidia-settings -q "$1/GPUPerfModes" -t | tr "\n" ' ' | tr ';' '\n' | sed -e 's/,//g' -e 's/^ //' -e 's/ [a-zA-Z]\+\(min\|max\)=[0-9]\+//g' -e 's/^perf=\([0-9]\) nvclock=\([0-9]\+\) memclock=\([0-9]\+\) memTransferRate=\([0-9]\+\) processorclock=\([0-9]\+\)\s*$/\1 \2 \3 \4 \5/' | sort -nk1;
 }
 
-DISPLAY="$1";
+export DISPLAY="$1";
 
 nvidia-settings -q gpus | grep 'gpu:' | sed 's/^.*\[\(gpu:[0-9]\+\)\]\s*(\([^)]\+\))\s*$/\1 \2/' | while read friendly_id name; do
 	id="[${friendly_id}]";
@@ -57,7 +57,7 @@ nvidia-settings -q gpus | grep 'gpu:' | sed 's/^.*\[\(gpu:[0-9]\+\)\]\s*(\([^)]\
 	echo -n " 'GPU utilization' GAUGE Percent ${gpu_load}";
 	echo -n " 'GPU idle' GAUGE Percent $((100 - $gpu_load))";
 	echo -n " 'Video RAM utilization' GAUGE Percent ${available_vram}";
-	echo -n " 'video RAM idle' GAUGE Percent $((100 - $available_vram))";
+	echo -n " 'Video RAM idle' GAUGE Percent $((100 - $available_vram))";
 	echo -n " 'Video utilization' GAUGE Percent ${video_load}";
 	echo -n " 'Video idle' GAUGE Percent $((100 - $video_load))";
 	echo -n " 'PCI-Express bus utilization' GAUGE Percent ${pcie_load}";
