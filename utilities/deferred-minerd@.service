@@ -1,0 +1,12 @@
+[Unit]
+Description=Deferred Data handler for minerd-style journaled logs in systemd
+After=%i.service
+
+[Service]
+User=_YOUR_USER_
+Type=simple
+ExecStart=/PATH/TO/SevOne-Deferred-Data-Scripts/processors/minerd-journalctl %i SEVONE.IP.OR.HOSTNAME SEVONE-USERNAME SEVONE-DEVICE-NAME
+WorkingDirectory=/PATH/TO/SevOne-Deferred-Data-Scripts/processors/
+
+[Install]
+WantedBy=multi-user.target

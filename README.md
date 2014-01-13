@@ -386,3 +386,39 @@ NVidia graphics card; metadata and utilization statistics alike.  An xAgent
 net-snmp plugin would be nicer for this purpose, but that doesn't seem to
 currently exist.
 
+
+
+minerd-journalctl
+=================
+* Language:  Python
+* Type:      Log parser
+* Reference: http://sourceforge.net/projects/cpuminer/
+* Usage:
+
+
+    minerd-journalctl systemd-service-name sevone.ip.or.hostname sevone-username sevone-password sevone-device-name
+
+This processor uses journalctl to read the log coming out of a minerd or
+compatible cryptocurrency miner (such as cpuminer or cudaminer) either live as
+it's written or into the past if --backfill is passed.
+
+This processor is unique in that it runs for an extended period of time,
+typically as a daemon, when not in backfil mode.  It spins up journalctl and
+deferred-data-import as subprocesses and keeps them alive as long as it runs.
+
+A systemd unit file is included: /utilities/deferred-minerd@.service - it will
+need to be modified before installation.  Most users should only need to modify
+the capitalized text.
+
+Note that this processor currently inserts a data point for, basically, every
+log entry.  Eventually it will perform aggregation-on-the-fly, but for now, be
+careful, as you could end up with a _lot_ of data on your disk.
+
+Python dependencies:
+* datetime
+* json
+* optparse
+* subprocess
+* sys
+* time
+

@@ -1,0 +1,158 @@
+#!/usr/bin/python2 -u
+
+import datetime
+import json
+from optparse import OptionParser
+import re
+import subprocess
+import sys
+import time
+
+# constants {{{
+regex_line_cpu = re.compile('^\[[^\]]+\] ([^:]+): ([0-9]+) hashes, ([0-9.]+) khash/s\s*$')
+regex_line_accepted = re.compile('^\[[^\]]+\] accepted: ([0-9]+)/([0-9]+) \(([0-9.]+)%\), ([0-9.]+) khash/s \(([^)]+)\)\s*$')
+regex_line_newblock = re.compile('^\[[^\]]+\] Stratum detected new block\s*$')
+regex_line_gpu = re.compile('^\[[^\]]+\] GPU #([0-9]+): ([^,]+), ([0-9.]+) khash/s\s*$')
+regex_line_autotune = re.compile('^\[[^\]]+\] GPU #([0-9]+): Performing auto-tuning \(Patience\.\.\.\)\s*$')
+regex_line_procstart = re.compile('^Started (.*)\.\s*$')
+regex_line_procstop = re.compile('^Stopped (.*)\.\s*$')
+# }}}
+
+# parse command-line arguments {{{
+cmdline = OptionParser(usage = 'usage: %prog [options] systemd-service-name sevone.ip.or.hostname sevone-username sevone-password sevone-device-name')
+cmdline.add_option('--deferred-path', action = 'store', dest = 'deferred_path', default = '../deferred-data-import', help = 'Path to deferred-data-import script')
+cmdline.add_option('--ssh', action = 'store', dest = 'ssh', default = None, help = 'IP address or hostname to SSH to and run the deferred data script; if used, --deferred-path is required')
+cmdline.add_option('--backfill', action = 'store_true', dest = 'backfill', default = False, help = 'Backfill data, by running journalctl with -l --no-pager instead of -f')
+
+(options, args) = cmdline.parse_args()
+if(len(args) != 5):
+	cmdline.print_help()
+	sys.exit(1)
+
+(service, sevone, username, password, devicename) = args
+# }}} 
+
+def to_timestamp(timestamp): # {{{
+	return int(time.mktime(time.strptime(timestamp, '%Y-%m-%dT%H:%M:%S')))
+# }}}
+
+def print_process_information(deferred, timestamp, service, process_stats): # {{{
+	seconds_since_this_loaded = str(timestamp - process_stats['last_block_loaded']) if process_stats['last_block_loaded'] != 'NULL' else 'NULL'
+	seconds_since_started = str(timestamp - process_stats['started_timestamp']) if process_stats['started_timestamp'] != 'NULL' else 'NULL'
+	deferred.stdin.write(str(timestamp) + ' "' + service + ': Process state" "Cryptocurrency process state" "Whole process" "Started" GAUGE Number ' + str(process_stats['started']) + ' "PID" GAUGE Number ' + process_stats['pid'] + ' "GPU?" GAUGE Number ' + str(process_stats['gpu']) + ' "Auto-tuned?" GAUGE Number ' + str(process_stats['autotuned']) + ' "Seconds since last block loaded" GAUGE Seconds ' + str(process_stats['block_age']) + ' "Timestamp this block was loaded" GAUGE Number ' + str(process_stats['last_block_loaded']) + ' "Seconds since this block was loaded" GAUGE Seconds ' + seconds_since_this_loaded + ' "Timestamp this process started" GAUGE Number ' + str(process_stats['started_timestamp']) + ' "Seconds since this process started" GAUGE Seconds ' + seconds_since_started + "\n")
+# }}}
+
+if(options.backfill):
+	journalctl = subprocess.Popen(['journalctl', '-u', service + '.service', '-l', '-o', 'json', '--no-pager'], stdout = subprocess.PIPE, stderr = 1)
+else:
+	journalctl = subprocess.Popen(['journalctl', '-u', service + '.service', '-l', '-o', 'json', '-f'], stdout = subprocess.PIPE)
+
+if(options.ssh == None):
+	deferred = subprocess.Popen([options.deferred_path, sevone, username, password, devicename], stdin = subprocess.PIPE, stdout = 1, stderr = subprocess.STDOUT)
+else:
+	deferred = subprocess.Popen(['ssh', options.ssh, options.deferred_path, sevone, username, password, devicename], stdin = subprocess.PIPE, stdout = 1, stderr = subprocess.STDOUT)
+
+process_information = {
+	'started' : 0,
+	'started_timestamp' : 'NULL',
+	'last_block_loaded' : 'NULL',
+	'block_age' : 'NULL',
+	'pid' : 'NULL',
+	'gpu' : 'NULL',
+	'autotuned' : 0
+}
+for line in iter(journalctl.stdout.readline, ''):
+	try:
+		obj = json.loads(line)
+	except ValueError:
+		continue
+	
+	if(not obj.has_key('_COMM')):
+		continue
+
+	timestamp = int(obj['__REALTIME_TIMESTAMP']) / 1000000
+	if(obj['_COMM'] == 'systemd'):
+		match = regex_line_procstart.match(obj['MESSAGE'])
+		if(match != None):
+			process_information['started'] = 1
+			process_information['autotuned'] = 0
+			process_information['started_timestamp'] = timestamp
+			process_information['last_block_loaded'] = timestamp
+			process_information['block_age'] = 0
+			process_information['started_timestamp'] = timestamp
+			print_process_information(deferred, timestamp, service, process_information)
+			continue
+
+		match = regex_line_procstop.match(obj['MESSAGE'])
+		if(match != None):
+			process_information['started'] = 0
+			process_information['autotuned'] = 0
+			if(process_information['last_block_loaded'] != 'NULL'):
+				process_information['block_age'] = timestamp - process_information['last_block_loaded']
+			else:
+				process_information['block_age'] = 'NULL'
+			process_information['last_block_loaded'] = 'NULL'
+			print_process_information(deferred, timestamp, service, process_information)
+			process_information['started_timestamp'] = 'NULL'
+			process_information['block_age'] = 'NULL'
+			process_information['pid'] = 'NULL'
+			continue
+	else:
+		if(obj.has_key('_PID')):
+			process_information['pid'] = obj['_PID']
+
+		match = regex_line_autotune.match(obj['MESSAGE'])
+		if(match != None):
+			process_information['autotuned'] = 1
+			print_process_information(deferred, timestamp, service, process_information)
+			continue
+			
+		match = regex_line_cpu.match(obj['MESSAGE'])
+		if(match != None):
+			process_information['gpu'] = 0
+			(thread_identifier, hashes, khash_per_sec) = match.groups()
+			deferred.stdin.write(str(timestamp) + ' "' + service + ': ' + thread_identifier + '" "Cryptocurrency CPU thread" "Individual thread" "PID" GAUGE Number ' + process_information['pid'] + ' "Hashes" GAUGE Number ' + hashes + ' "KHash/sec" GAUGE Number ' + khash_per_sec + "\n")
+			continue
+		
+		match = regex_line_gpu.match(obj['MESSAGE'])
+		if(match != None):
+			process_information['gpu'] = 1
+			(gpu_id, gpu_name, khash_per_sec) = match.groups()
+			deferred.stdin.write(str(timestamp) + ' "' + service + ': GPU #' + gpu_id + ' (' + gpu_name + ')" "Cryptocurrency GPU thread" "Individual thread" "PID" GAUGE Number ' + process_information['pid'] + ' "GPU ID" GAUGE Number ' + gpu_id + ' "KHash/sec" GAUGE Number ' + khash_per_sec + "\n")
+			continue
+		
+		match = regex_line_newblock.match(obj['MESSAGE'])
+		if(match != None):
+			if(process_information['last_block_loaded'] != 'NULL'):
+				process_information['block_age'] = str(timestamp - process_information['last_block_loaded'])
+			else:
+				process_information['block_age'] = 0
+			process_information['last_block_loaded'] = timestamp
+			print_process_information(deferred, timestamp, service, process_information)
+			continue
+
+		match = regex_line_accepted.match(obj['MESSAGE'])
+		if(match != None):
+			(accepted_shares, total_shares, percent_successful, khash_per_sec, exclamation) = match.groups()
+
+			rejected_shares = str(int(total_shares) - int(accepted_shares))
+			percent_unsuccessful = str(100.0 - float(percent_successful))
+			successful_this_time = '1' if(exclamation == 'yay!!!') else '0'
+			if(process_information['started_timestamp'] == 'NULL'):
+				accepted_per_second = 'NULL'
+				rejected_per_second = 'NULL'
+				total_per_second = 'NULL'
+			else:
+				seconds_since_started = timestamp - process_information['started_timestamp']
+				if(seconds_since_started == 0):
+					accepted_per_second = 'NULL'
+					rejected_per_second = 'NULL'
+					total_per_second = 'NULL'
+				else:
+					accepted_per_second = str(float(accepted_shares) / seconds_since_started)
+					rejected_per_second = str(float(rejected_shares) / seconds_since_started)
+					total_per_second = str(float(total_shares) / seconds_since_started)
+
+			deferred.stdin.write(str(timestamp) + ' "' + service + ': Shares" "Cryptocurrency shares" "Whole process" "PID" GAUGE Number ' + process_information['pid'] + ' "Accepted shares" GAUGE Number ' + accepted_shares + ' "Accepted shares per second" COUNTER32 Number ' + accepted_shares + ' "Average accepted shares per second" GAUGE Number ' + accepted_per_second + ' "Rejected shares" GAUGE Number ' + rejected_shares + ' "Rejected shares per second" COUNTER32 Number ' + rejected_shares + ' "Average rejected shares per second" GAUGE Number ' + rejected_per_second + ' "Total shares" GAUGE Number ' + total_shares + ' "Total shares per second" COUNTER32 Number ' + total_shares + ' "Average total shares per second" GAUGE Number ' + total_per_second + ' "Percent successful" GAUGE Percent ' + percent_successful + ' "Percent unsuccessful" GAUGE Percent ' + percent_unsuccessful + ' "KHash/sec" GAUGE Number ' + khash_per_sec + ' "This share accepted?" GAUGE Number ' + successful_this_time + "\n")
+			continue
+
