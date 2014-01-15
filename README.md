@@ -422,3 +422,27 @@ Python dependencies:
 * sys
 * time
 
+
+
+cgminer
+=======
+* Language:  Python
+* Type:      API
+* Reference: https://github.com/ckolivas/cgminer
+* Usage:
+
+
+    cgminer [options] cgminer.ip.or.hostname
+
+This processor connects to the API on a cgminer process to scrape stats.  It
+can currently scrape whole process stats and stats about GPUs; it doesn't yet
+support USB devices like ASICs.
+
+Python dependencies:
+* datetime
+* json
+* optparse
+* socket
+* sys
+* time
+

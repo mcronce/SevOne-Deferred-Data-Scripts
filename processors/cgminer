@@ -1,0 +1,119 @@
+#!/usr/bin/python2
+
+import datetime
+import json
+from optparse import OptionParser
+import socket
+import sys
+import time
+
+# constants {{{
+#regex_line_accepted = re.compile('^\[[^\]]+\] accepted: ([0-9]+)/([0-9]+) \(([0-9.]+)%\), ([0-9.]+) khash/s \(([^)]+)\)\s*$')
+#regex_line_newblock = re.compile('^\[[^\]]+\] Stratum from pool [0-9]\+ detected new block\s*$')
+#regex_line_gpu = re.compile('^\[[^\]]+\] GPU #([0-9]+): ([^,]+), ([0-9.]+) khash/s\s*$')
+#regex_line_autotune = re.compile('^\[[^\]]+\] GPU #([0-9]+): Performing auto-tuning \(Patience\.\.\.\)\s*$')
+#regex_line_procstart = re.compile('^Started (.*)\.\s*$')
+#regex_line_procstop = re.compile('^Stopped (.*)\.\s*$')
+# }}}
+
+# parse command-line arguments {{{
+cmdline = OptionParser(usage = 'usage: %prog [options] ip.or.hostname')
+cmdline.add_option('--port', '-p', action = 'store', dest = 'port', default = '4028', help = 'Connect on this port (default 4028)')
+
+(options, args) = cmdline.parse_args()
+if(len(args) != 1):
+	cmdline.print_help()
+	sys.exit(1)
+
+(host,) = args
+# }}} 
+
+def get_timestamp(): # {{{
+	return str(int(time.mktime(datetime.now().timetuple())))
+# }}}
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.connect((host, int(options.port)))
+sock.send('{"command":"summary"}')
+obj = json.loads(sock.recv(8192)[0:-1])
+sock.close()
+status = obj['STATUS'][0]
+summary = obj['SUMMARY'][0]
+sys.stdout.write(str(status['When']) + ' "cgminer: Whole process" "cgminer: Whole process" "' + status['Description'] + '"')
+sys.stdout.write(' "Elapsed time" GAUGE Seconds ' + str(summary['Elapsed']))
+sys.stdout.write(' "KHash /sec, average" GAUGE Kilohash ' + str(summary['MHS av'] * 1000.0))
+sys.stdout.write(' "Found blocks" GAUGE Number ' + str(summary['Found Blocks']))
+sys.stdout.write(' "Found blocks /sec" COUNTER64 Number ' + str(summary['Found Blocks']))
+sys.stdout.write(' "Blocks of work retrieved" GAUGE Number ' + str(summary['Getworks']))
+sys.stdout.write(' "Blocks of work retrieved /sec" COUNTER64 Number ' + str(summary['Getworks']))
+sys.stdout.write(' "Accepted shares" GAUGE Number ' + str(summary['Accepted']))
+sys.stdout.write(' "Accepted shares /sec" COUNTER64 Number ' + str(summary['Accepted']))
+sys.stdout.write(' "Rejected shares" GAUGE Number ' + str(summary['Rejected']))
+sys.stdout.write(' "Rejected shares /sec" COUNTER64 Number ' + str(summary['Rejected']))
+sys.stdout.write(' "Hardware errors" GAUGE Number ' + str(summary['Hardware Errors']))
+sys.stdout.write(' "Hardware errors /sec" COUNTER64 Number ' + str(summary['Hardware Errors']))
+sys.stdout.write(' "Utility" GAUGE Number ' + str(summary['Utility']))
+sys.stdout.write(' "Stale" GAUGE Number ' + str(summary['Stale']))
+sys.stdout.write(' "Stale /sec" COUNTER64 Number ' + str(summary['Stale']))
+sys.stdout.write(' "Discarded shares" GAUGE Number ' + str(summary['Discarded']))
+sys.stdout.write(' "Discarded shares /sec" COUNTER64 Number ' + str(summary['Discarded']))
+sys.stdout.write(' "Failures retrieving work" GAUGE Number ' + str(summary['Get Failures']))
+sys.stdout.write(' "Failures retrieving work /sec" COUNTER64 Number ' + str(summary['Get Failures']))
+sys.stdout.write(' "Local work" GAUGE Number ' + str(summary['Local Work']))
+sys.stdout.write(' "Local work /sec" COUNTER64 Number ' + str(summary['Local Work']))
+sys.stdout.write(' "Remote failures" GAUGE Number ' + str(summary['Remote Failures']))
+sys.stdout.write(' "Remote failures /sec" COUNTER64 Number ' + str(summary['Remote Failures']))
+sys.stdout.write(' "Total KHash" GAUGE Kilohash ' + str(summary['Total MH'] * 1000.0))
+sys.stdout.write(' "Total KHash /sec" COUNTER64 Kilohash ' + str(summary['Total MH'] * 1000.0))
+sys.stdout.write(' "Work utility" GAUGE Number ' + str(summary['Work Utility']))
+sys.stdout.write(' "Difficulty accepted" GAUGE Number ' + str(summary['Difficulty Accepted']))
+sys.stdout.write(' "Difficulty rejected" GAUGE Number ' + str(summary['Difficulty Rejected']))
+sys.stdout.write(' "Difficulty stale" GAUGE Number ' + str(summary['Difficulty Stale']))
+sys.stdout.write(' "Best share" GAUGE Number ' + str(summary['Best Share']))
+sys.stdout.write("\n")
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.connect((host, int(options.port)))
+sock.send('{"command":"gpucount"}')
+obj = json.loads(sock.recv(4096)[0:-1])
+sock.close()
+devs = obj['GPUS'][0]['Count']
+for i in xrange(0, devs):
+	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	sock.connect((host, int(options.port)))
+	sock.send('{"command":"gpu","parameter":"' + str(i) + '"}')
+	obj = json.loads(sock.recv(16384)[0:-1])
+	sock.close()
+	status = obj['STATUS'][0]
+	gpu = obj['GPU'][0]
+	timestamp = status['When']
+	sys.stdout.write(str(timestamp) + ' "cgminer: GPU ' + str(i) + '" "cgminer: GPU" "' + status['Description'] + '"')
+	sys.stdout.write(' "Temperature" GAUGE "Degrees C" ' + str(gpu['Temperature']))
+	sys.stdout.write(' "Fan speed" GAUGE RPM ' + str(gpu['Fan Speed']))
+	sys.stdout.write(' "Fan percent" GAUGE Percent ' + str(gpu['Fan Percent']))
+	sys.stdout.write(' "GPU clock" GAUGE Megahertz ' + str(gpu['GPU Clock']))
+	sys.stdout.write(' "Memory clock" GAUGE Megahertz ' + str(gpu['Memory Clock']))
+	sys.stdout.write(' "GPU voltage" GAUGE Volts ' + str(gpu['GPU Voltage']))
+	sys.stdout.write(' "GPU utilization" GAUGE Percent ' + str(gpu['GPU Activity']))
+	sys.stdout.write(' "Powertune" GAUGE Number ' + str(gpu['Powertune']))
+	sys.stdout.write(' "KHash /sec, average" GAUGE Kilohash ' + str(gpu['MHS av'] * 1000.0))
+	sys.stdout.write(' "KHash /sec, 5-second average" GAUGE Kilohash ' + str(gpu['MHS 5s'] * 1000.0))
+	sys.stdout.write(' "Accepted shares" GAUGE Number ' + str(gpu['Accepted']))
+	sys.stdout.write(' "Accepted shares /sec" COUNTER64 Number ' + str(gpu['Accepted']))
+	sys.stdout.write(' "Rejected shares" GAUGE Number ' + str(gpu['Rejected']))
+	sys.stdout.write(' "Rejected shares /sec" COUNTER64 Number ' + str(gpu['Rejected']))
+	sys.stdout.write(' "Hardware errors" GAUGE Number ' + str(gpu['Hardware Errors']))
+	sys.stdout.write(' "Hardware errors /sec" COUNTER64 Number ' + str(gpu['Hardware Errors']))
+	sys.stdout.write(' "Utility" GAUGE Number ' + str(gpu['Utility']))
+	sys.stdout.write(' "Intensity" GAUGE Number ' + str(gpu['Intensity']))
+	sys.stdout.write(' "Last shared to pool index" GAUGE Number ' + str(gpu['Last Share Pool']))
+	sys.stdout.write(' "Seconds since last share" GAUGE Seconds ' + str(timestamp - gpu['Last Share Time']))
+	sys.stdout.write(' "Total KHash" GAUGE Kilohash ' + str(gpu['Total MH'] * 1000.0))
+	sys.stdout.write(' "Total KHash /sec" COUNTER64 Kilohash ' + str(gpu['Total MH'] * 1000.0))
+	sys.stdout.write(' "Difficulty 1 work" GAUGE Number ' + str(gpu['Diff1 Work']))
+	sys.stdout.write(' "Difficulty accepted" GAUGE Number ' + str(gpu['Difficulty Accepted']))
+	sys.stdout.write(' "Difficulty rejected" GAUGE Number ' + str(gpu['Difficulty Rejected']))
+	sys.stdout.write(' "Last share difficulty" GAUGE Number ' + str(gpu['Last Share Difficulty']))
+	sys.stdout.write(' "Seconds since last valid work" GAUGE Seconds ' + str(timestamp - gpu['Last Valid Work']))
+	sys.stdout.write("\n")
+
