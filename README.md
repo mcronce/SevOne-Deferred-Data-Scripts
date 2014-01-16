@@ -461,3 +461,20 @@ wemineltc
 This processor logs into a We Mine LTC account and scrapes data about the LTC
 network as a whole, the We Mine LTC pool, the user's accoutn, and the user's
 individual workers.
+
+
+
+wemineftc
+=========
+* Language:  CasperJS
+* Type:      Screen scraper
+* Reference: http://www.wemineftc.com/
+* Usage:
+
+
+	wemineftc Username Password
+
+This processor logs into a We Mine FTC account and scrapes data about the ftc
+network as a whole, the We Mine FTC pool, the user's account, and the user's
+individual workers.
+
