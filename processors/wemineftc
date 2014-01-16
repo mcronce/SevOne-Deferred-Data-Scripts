@@ -116,7 +116,7 @@ casper.run(function printAllData() {
 		' "Estimated earnings this round" GAUGE Feathercoin ' + account_data.round_estimate +
 		' "Estimated earnings /sec" COUNTER64 Microfeathercoin ' + (account_data.round_estimate * 1000000) +
 		' "Account balance" GAUGE Feathercoin ' + account_data.account_balance +
-		' "Account balance delta/sec" COUNTER64 Microfeathercoin ' + (account_data.round_estimate * 1000000)
+		' "Account balance delta/sec" COUNTER64 Microfeathercoin ' + (account_data.account_balance * 1000000)
 	);
 	for(var name in worker_data) {
 		var worker = worker_data[name];

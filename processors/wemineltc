@@ -118,7 +118,7 @@ casper.run(function printAllData() {
 		' "Estimated earnings this round" GAUGE Litecoin ' + account_data.round_estimate +
 		' "Estimated earnings /sec" COUNTER64 Microlitecoin ' + (account_data.round_estimate * 1000000) +
 		' "Account balance" GAUGE Litecoin ' + account_data.account_balance +
-		' "Account balance delta/sec" COUNTER64 Microlitecoin ' + (account_data.round_estimate * 1000000)
+		' "Account balance delta/sec" COUNTER64 Microlitecoin ' + (account_data.account_balance * 1000000)
 	);
 	for(var name in worker_data) {
 		var worker = worker_data[name];
