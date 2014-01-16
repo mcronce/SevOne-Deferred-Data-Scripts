@@ -22,22 +22,6 @@ var password = system.args[5];
 var casper = require('casper').create();
 casper.userAgent('Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31');
 
-// looks like we need to do this part to force the onLoad javascript to run?...
-function javascriptOnLoad() {
-	//this.echo(this.getHTML());
-	//$(document).on('site:loaded', function() {
-	YAHOO.util.Event.onDOMReady(function() {
-		window.siteLoaded = true;
-	});
-	return true;
-}
-
-function javascriptLoadedCheck() {
-	return this.evaluate(function() {
-		return window.siteLoaded === true;
-	}) === true;
-}
-
 casper.start('https://www.wemineltc.com/', function loadSite() {
 	return true;
 });
