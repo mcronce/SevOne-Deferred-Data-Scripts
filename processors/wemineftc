@@ -114,7 +114,9 @@ casper.run(function printAllData() {
 		' "Unpaid shares" GAUGE Number ' + account_data.unpaid_mine +
 		' "Unpaid shares /sec" COUNTER64 Number ' + account_data.unpaid_mine +
 		' "Estimated earnings this round" GAUGE Feathercoin ' + account_data.round_estimate +
-		' "Account balance" GAUGE Feathercoin ' + account_data.account_balance
+		' "Estimated earnings /sec" COUNTER64 Microfeathercoin ' + (account_data.round_estimate * 1000000) +
+		' "Account balance" GAUGE Feathercoin ' + account_data.account_balance +
+		' "Account balance delta/sec" COUNTER64 Microfeathercoin ' + (account_data.round_estimate * 1000000)
 	);
 	for(var name in worker_data) {
 		var worker = worker_data[name];
