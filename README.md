@@ -459,7 +459,7 @@ wemineltc
 	wemineltc Username Password
 
 This processor logs into a We Mine LTC account and scrapes data about the LTC
-network as a whole, the We Mine LTC pool, the user's accoutn, and the user's
+network as a whole, the We Mine LTC pool, the user's account, and the user's
 individual workers.
 
 
