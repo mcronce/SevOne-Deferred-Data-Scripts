@@ -10,12 +10,6 @@ if(system.args.length != 6) {
 	phantom.exit(1);
 }
 
-String.prototype.toProperCase = function toProperCase() {
-	return this.replace(/\w\S*/g, function _toProperCase(txt) {
-		return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
-	});
-};
-
 var username = system.args[4];
 var password = system.args[5];
 
@@ -25,27 +19,6 @@ casper.userAgent('Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML,
 casper.start('https://www.wemineltc.com/', function loadSite() {
 	return true;
 });
-
-// This is some debug code that overrides some of Mint's libraries with local copies.
-/*casper.on('resource.requested', function onResourceRequested(requestData, networkRequest) {
-	if(requestData.url == 'https://wwws.mint.com/sc/ph4474.7/js/library.js') {
-		networkRequest.changeUrl(fs.workingDirectory + '/debug/mint/library.js');
-	} else if(requestData.url == 'https://wwws.mint.com/sc/ph4474.7/js/summary.js') {
-		networkRequest.changeUrl(fs.workingDirecotry + '/debug/mint/summary.js');
-	} else if(requestData.url == 'https://wwws.mint.com/sc/ph4474.7/js/lib/mint_s_code.js') {
-		networkRequest.changeUrl(fs.workingDirecotry + '/debug/mint/s-code.js');
-	}
-});*/
-
-// This is some debug code that prints out the URL to every single resource that a page loads.
-/*casper.on('resource.received', function onResourceReceived(resource) {
-	this.echo('--- ' + resource.url);
-});*/
-
-// This is some debug code that prints remote (in-page) log statements to the local console.
-/*casper.on('remote.message', function onRemoteMessage(msg) {
-	this.echo('+++ ' + msg);
-});*/
 
 casper.then(function login() {
 	this.fill('form#loginForm', {
