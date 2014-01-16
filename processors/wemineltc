@@ -137,11 +137,39 @@ casper.then(function scrapeWorkers() {
 });
 
 casper.run(function printAllData() {
-	this.echo(current_timestamp + ' "WeMineLTC" "WeMineLTC pool" "Pool/network stats" "BTC/LTC" GAUGE Bitcoin ' + top_stats.btc_ltc + ' "USD/LTC" GAUGE Dollars ' + top_stats.usd_ltc + ' "Pool workers" GAUGE Number ' + top_stats.workers + ' "Pool hashrate" GAUGE Megahash ' + top_stats.pool_hashrate + ' "Network difficulty" GAUGE Number ' + top_stats.network_difficulty + ' "Pool unpaid shares" GAUGE Number ' + account_data.unpaid_pool + ' "Pool unpaid shares /sec" COUNTER64 Number ' + account_data.unpaid_pool + ' "Pool shares this round" GAUGE Number ' + account_data.round_pool + ' "Pool shares /sec" COUNTER64 Number ' + account_data.round_pool);
-	this.echo(current_timestamp + ' "WeMineLTC account: ' + username + '" "WeMineLTC account" "Account totals" "Current hashrate" GAUGE Kilohash ' + account_data.hashrate + ' "Paid valid shares" GAUGE Number ' + account_data.paid_valid + ' "Paid valid shares /sec" COUNTER64 Number ' + account_data.paid_valid + ' "Paid invalid shares" GAUGE Number ' + account_data.paid_invalid + ' "Paid invalid shares /sec" COUNTER64 Number ' + account_data.paid_invalid + ' "Unpaid shares" GAUGE Number ' + account_data.unpaid_mine + ' "Unpaid shares /sec" COUNTER64 Number ' + account_data.unpaid_mine + ' "Estimated earnings this round" GAUGE Litecoin ' + account_data.round_estimate + ' "Account balance" GAUGE Litecoin ' + account_data.account_balance);
+	this.echo(
+		current_timestamp + ' "WeMineLTC" "WeMineLTC pool" "Pool/network stats"' +
+		' "BTC/LTC" GAUGE Bitcoin ' + top_stats.btc_ltc +
+		' "USD/LTC" GAUGE Dollars ' + top_stats.usd_ltc +
+		' "Pool workers" GAUGE Number ' + top_stats.workers +
+		' "Pool hashrate" GAUGE Megahash ' + top_stats.pool_hashrate +
+		' "Network difficulty" GAUGE Number ' + top_stats.network_difficulty +
+		' "Pool unpaid shares" GAUGE Number ' + account_data.unpaid_pool +
+		' "Pool unpaid shares /sec" COUNTER64 Number ' + account_data.unpaid_pool +
+		' "Pool shares this round" GAUGE Number ' + account_data.round_pool +
+		' "Pool shares /sec" COUNTER64 Number ' + account_data.round_pool
+	);
+	this.echo(
+		current_timestamp + ' "WeMineLTC account: ' + username + '" "WeMineLTC account" "Account totals"' +
+		' "Current hashrate" GAUGE Kilohash ' + account_data.hashrate +
+		' "Paid valid shares" GAUGE Number ' + account_data.paid_valid +
+		' "Paid valid shares /sec" COUNTER64 Number ' + account_data.paid_valid +
+		' "Paid invalid shares" GAUGE Number ' + account_data.paid_invalid +
+		' "Paid invalid shares /sec" COUNTER64 Number ' + account_data.paid_invalid +
+		' "Unpaid shares" GAUGE Number ' + account_data.unpaid_mine +
+		' "Unpaid shares /sec" COUNTER64 Number ' + account_data.unpaid_mine +
+		' "Estimated earnings this round" GAUGE Litecoin ' + account_data.round_estimate +
+		' "Account balance" GAUGE Litecoin ' + account_data.account_balance
+	);
 	for(var name in worker_data) {
 		var worker = worker_data[name];
-		this.echo(current_timestamp + ' "WeMineLTC worker: ' + name + '" "WeMineLTC worker" "Individual worker" "Active?" GAUGE Number ' + worker.active + ' "Hashrate" GAUGE Kilohash ' + worker.hashrate + ' "Suggested difficulty" GAUGE Number ' + worker.suggested_difficulty + ' "Max difficulty" GAUGE Number ' + worker.max_difficulty); 
+		this.echo(
+			current_timestamp + ' "WeMineLTC worker: ' + name + '" "WeMineLTC worker" "Individual worker"' +
+			' "Active?" GAUGE Number ' + worker.active +
+			' "Hashrate" GAUGE Kilohash ' + worker.hashrate +
+			' "Suggested difficulty" GAUGE Number ' + worker.suggested_difficulty +
+			' "Max difficulty" GAUGE Number ' + worker.max_difficulty
+		); 
 	}
 	phantom.exit(0);
 });
