@@ -115,8 +115,10 @@ casper.run(function printAllData() {
 		' "Unpaid shares /sec" COUNTER64 Number ' + account_data.unpaid_mine +
 		' "Estimated earnings this round" GAUGE Feathercoin ' + account_data.round_estimate +
 		' "Estimated earnings /sec" COUNTER64 Microfeathercoin ' + (account_data.round_estimate * 1000000) +
+		' "Estimated earnings this round in Millibitcoin" GAUGE Millibitcoin ' + (account_data.round_estimate * top_stats.btc_ftc * 1000) +
 		' "Account balance" GAUGE Feathercoin ' + account_data.account_balance +
-		' "Account balance delta/sec" COUNTER64 Microfeathercoin ' + (account_data.account_balance * 1000000)
+		' "Account balance delta/sec" COUNTER64 Microfeathercoin ' + (account_data.account_balance * 1000000) +
+		' "Account balance in Millibitcoin" GAUGE Millibitcoin ' + (account_data.account_balance * top_stats.btc_ftc * 1000)
 	);
 	for(var name in worker_data) {
 		var worker = worker_data[name];
