@@ -99,6 +99,7 @@ for i in xrange(0, devs):
 	sys.stdout.write(' "GPU voltage" GAUGE Volts ' + str(gpu['GPU Voltage']))
 	sys.stdout.write(' "GPU utilization" GAUGE Percent ' + str(gpu['GPU Activity']))
 	sys.stdout.write(' "Powertune" GAUGE Number ' + str(gpu['Powertune']))
+	sys.stdout.write(' "Intensity" GAUGE Number ' + str(gpu['Intensity']))
 	sys.stdout.write(' "KHash /sec, average" GAUGE Kilohash ' + str(gpu['MHS av'] * 1000.0))
 	sys.stdout.write(' "KHash /sec, 5-second average" GAUGE Kilohash ' + str(gpu['MHS 5s'] * 1000.0))
 	sys.stdout.write(' "Accepted shares" GAUGE Number ' + str(gpu['Accepted']))
