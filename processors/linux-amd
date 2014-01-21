@@ -1,0 +1,146 @@
+#!/usr/bin/python2 -u
+
+import datetime
+import json
+from optparse import OptionParser
+import os
+import re
+import subprocess
+import sys
+import time
+
+# constants {{{
+regex_line_procstop = re.compile('^Stopped (.*)\.\s*$')
+regex_card = re.compile('^Adapter ([0-9]+) - (.*)\s*$')
+regex_card2 = re.compile('^Default Adapter - (.*)\s*$')
+regex_temperature = re.compile('^.*Sensor(?: [0-9]+)?: Temperature - ([0-9.]+) C\s*$')
+regex_currentclocks = re.compile('^\s*Current Clocks :\s*([0-9]+)\s*([0-9]+)\s*$')
+regex_peakclocks = re.compile('^\s*Current Peak :\s*([0-9]+)\s*([0-9]+)\s*$')
+regex_clockrange = re.compile('^.*Configurable Peak Range :.*\[([0-9]+)-([0-9]+)\].*\[([0-9]+)-([0-9]+)\].*$')
+regex_gpuload = re.compile('^\s*GPU load :\s*([0-9]+)%\s*$')
+# }}}
+
+# parse command-line arguments {{{
+cmdline = OptionParser(usage = 'usage: %prog X_Display_ID')
+
+(options, args) = cmdline.parse_args()
+if(len(args) != 1):
+	cmdline.print_help()
+	sys.exit(1)
+
+(display,) = args
+# }}} 
+
+def get_timestamp(): # {{{
+	return str(int(time.mktime(datetime.datetime.now().timetuple())))
+# }}}
+
+def find_card(cards, line): # {{{
+	match = regex_card.match(line)
+	if(match):
+		(card_index, card_name) = match.groups()
+		card_index = int(card_index)
+		if(card_index >= len(cards)):
+			cards.append({'name' : card_name.strip()})
+	
+		return [cards, card_index]
+	
+	match = regex_card2.match(line)
+	if(match):
+		(card_name,) = match.groups()
+		card_index = len(cards)
+		cards.append({'name' : card_name.strip()})
+
+		return [cards, card_index]
+	
+	return [cards]
+# }}}
+
+def parse_odgt(cards, fp): # {{{
+	card_index = -1
+	for line in iter(fp.stdout.readline, ''):
+		check = find_card(cards, line)
+		if(len(check) > 1):
+			cards = check[0]
+			card_index = check[1]
+			continue
+		else:
+			cards = check[0]
+
+		match = regex_temperature.match(line)
+		if(match != None):
+			(cards[card_index]['temperature'],) = match.groups()
+			continue
+	
+	return cards
+# }}}
+
+def parse_odgc(cards, fp): # {{{
+	for line in iter(fp.stdout.readline, ''):
+		check = find_card(cards, line)
+		if(len(check) > 1):
+			cards = check[0]
+			card_index = check[1]
+			continue
+		else:
+			cards = check[0]
+
+		match = regex_currentclocks.match(line)
+		if(match != None):
+			(cards[card_index]['coreclock_current'], cards[card_index]['memclock_current']) = match.groups()
+			continue
+
+		match = regex_peakclocks.match(line)
+		if(match != None):
+			(cards[card_index]['coreclock_peak'], cards[card_index]['memclock_peak']) = match.groups()
+			continue
+
+		match = regex_clockrange.match(line)
+		if(match != None):
+			(cards[card_index]['coreclock_min'], cards[card_index]['coreclock_max'], cards[card_index]['memclock_min'], cards[card_index]['memclock_max']) = match.groups()
+			continue
+
+		match = regex_gpuload.match(line)
+		if(match != None):
+			(cards[card_index]['load'],) = match.groups()
+			continue
+	
+	return cards
+# }}}
+
+cards = []
+timestamp = get_timestamp()
+env = os.environ.copy()
+env['DISPLAY'] = display
+
+odgt = subprocess.Popen(['aticonfig', '--odgt', '--adapter=all'], stdout = subprocess.PIPE, env = env)
+cards = parse_odgt(cards, odgt)
+
+odgc = subprocess.Popen(['aticonfig', '--odgc', '--adapter=all'], stdout = subprocess.PIPE, env = env)
+cards = parse_odgc(cards, odgc)
+
+for i in xrange(0, len(cards)):
+	card = cards[i]
+	sys.stdout.write(timestamp + ' "gpu:' + str(i) + '" "AMD GPU on Linux" "' + card['name'] + '"')
+	sys.stdout.write(' "Load used" GAUGE Percent ' + card['load'])
+	sys.stdout.write(' "Load idle" GAUGE Percent ' + str(100 - int(card['load'])))
+	sys.stdout.write(' "Clocks in use" GAUGE Megaclocks ' + str(float(card['load']) / 100 * float(card['coreclock_current'])))
+	sys.stdout.write(' "Temperature" GAUGE "Degrees C" ' + card['temperature'])
+	sys.stdout.write(' "Current core clock" GAUGE Megahertz ' + card['coreclock_current'])
+	if(card.has_key('coreclock_min')):
+		sys.stdout.write(' "Minimum core clock" GAUGE Megahertz ' + card['coreclock_min'])
+		sys.stdout.write(' "Maximum core clock" GAUGE Megahertz ' + card['coreclock_max'])
+		sys.stdout.write(' "Peak core clock" GAUGE Megahertz ' + card['coreclock_peak'])
+		sys.stdout.write(' "Current core clock as a percentage of peak" GAUGE Percent ' + str(float(card['coreclock_min']) / float(card['coreclock_peak']) * 100))
+		sys.stdout.write(' "Current core clock as a percentage of maximum" GAUGE Percent ' + str(float(card['coreclock_min']) / float(card['coreclock_max']) * 100))
+		sys.stdout.write(' "Peak core clock as a percentage of maximum" GAUGE Percent ' + str(float(card['coreclock_peak']) / float(card['coreclock_max']) * 100))
+	sys.stdout.write(' "Current memory clock" GAUGE Megahertz ' + card['memclock_current'])
+	if(card.has_key('memclock_min')):
+		sys.stdout.write(' "Minimum memory clock" GAUGE Megahertz ' + card['memclock_min'])
+		sys.stdout.write(' "Maximum memory clock" GAUGE Megahertz ' + card['memclock_max'])
+		sys.stdout.write(' "Peak memory clock" GAUGE Megahertz ' + card['memclock_peak'])
+		sys.stdout.write(' "Current memory clock as a percentage of peak" GAUGE Percent ' + str(float(card['memclock_min']) / float(card['memclock_peak']) * 100))
+		sys.stdout.write(' "Current memory clock as a percentage of maximum" GAUGE Percent ' + str(float(card['memclock_min']) / float(card['memclock_max']) * 100))
+		sys.stdout.write(' "Peak memory clock as a percentage of maximum" GAUGE Percent ' + str(float(card['memclock_peak']) / float(card['memclock_max']) * 100))
+	sys.stdout.write("\n")
+
