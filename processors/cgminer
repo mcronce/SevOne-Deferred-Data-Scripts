@@ -124,3 +124,38 @@ for i in xrange(0, devs):
 	sys.stdout.write(' "Seconds since last valid work" GAUGE Seconds ' + str(timestamp - gpu['Last Valid Work']))
 	sys.stdout.write("\n")
 
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.connect((host, int(options.port)))
+sock.send('{"command":"pools"}')
+obj = json.loads(sock.recv(4096)[0:-1])
+sock.close()
+status = obj['STATUS'][0]
+pools = obj['POOLS']
+for i in xrange(0, len(pools)):
+	pool = obj['POOLS'][i]
+	timestamp = status['When']
+	sys.stdout.write(str(timestamp) + ' "cgminer: Pool: \'' + pool['URL'] + '\'" "cgminer: GPU" "' + status['Description'] + '"')
+	sys.stdout.write(' "Accepted shares" GAUGE Number ' + str(pool['Accepted']))
+	sys.stdout.write(' "Accepted shares /sec" COUNTER64 Number ' + str(pool['Accepted']))
+	sys.stdout.write(' "Best share" GAUGE Number ' + str(pool['Best Share']))
+	sys.stdout.write(' "Difficulty shared" GAUGE Number ' + str(pool['Diff1 Shares']))
+	sys.stdout.write(' "Difficulty shared /sec" COUNTER64 Number ' + str(pool['Diff1 Shares']))
+	sys.stdout.write(' "Difficulty accepted" GAUGE Number ' + str(pool['Difficulty Accepted']))
+	sys.stdout.write(' "Difficulty accepted /sec" COUNTER64 Number ' + str(pool['Difficulty Accepted']))
+	sys.stdout.write(' "Difficulty rejected" GAUGE Number ' + str(pool['Difficulty Rejected']))
+	sys.stdout.write(' "Difficulty rejected /sec" COUNTER64 Number ' + str(pool['Difficulty Rejected']))
+	sys.stdout.write(' "Difficulty stale" GAUGE Number ' + str(pool['Difficulty Stale']))
+	sys.stdout.write(' "Difficulty stale /sec" COUNTER64 Number ' + str(pool['Difficulty Stale']))
+	sys.stdout.write(' "Discards" GAUGE Number ' + str(pool['Discarded']))
+	sys.stdout.write(' "Discards /sec" COUNTER64 Number ' + str(pool['Discarded']))
+	sys.stdout.write(' "Failures retrieving work" GAUGE Number ' + str(pool['Get Failures']))
+	sys.stdout.write(' "Failures retrieving work /sec" COUNTER64 Number ' + str(pool['Get Failures']))
+	sys.stdout.write(' "Blocks of work retrieved" GAUGE Number ' + str(pool['Getworks']))
+	sys.stdout.write(' "Blocks of work retrieved /sec" COUNTER64 Number ' + str(pool['Getworks']))
+	sys.stdout.write(' "Last share difficulty" GAUGE Number ' + str(pool['Last Share Difficulty']))
+	sys.stdout.write(' "Seconds since last share" GAUGE Number ' + str(timestamp - pool['Last Share Time']))
+	sys.stdout.write(' "Percent rejected" GAUGE Percent ' + str(pool['Pool Rejected%']))
+	sys.stdout.write(' "Percent stale" GAUGE Percent ' + str(pool['Pool Stale%']))
+	sys.stdout.write(' "Percent accepted" GAUGE Percent ' + str(100.0 - (pool['Pool Rejected%'] + pool['Pool Stale%'])))
+	sys.stdout.write("\n")
+
