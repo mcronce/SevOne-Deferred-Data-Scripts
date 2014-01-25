@@ -137,6 +137,7 @@ for i in xrange(0, len(pools)):
 	pool = obj['POOLS'][i]
 	timestamp = status['When']
 	sys.stdout.write(str(timestamp) + ' "cgminer: Pool: \'' + pool['URL'] + '\'" "cgminer: Pool" "' + status['Description'] + '"')
+	sys.stdout.write(' "Active" GAUGE Number ' + ('1' if pool['Status'] == 'Alive' else '0'))
 	sys.stdout.write(' "Accepted shares" GAUGE Number ' + str(pool['Accepted']))
 	sys.stdout.write(' "Accepted shares /sec" COUNTER64 Number ' + str(pool['Accepted']))
 	sys.stdout.write(' "Best share" GAUGE Number ' + str(pool['Best Share']))
@@ -159,7 +160,8 @@ for i in xrange(0, len(pools)):
 	sys.stdout.write(' "Percent rejected" GAUGE Percent ' + str(pool['Pool Rejected%']))
 	sys.stdout.write(' "Percent stale" GAUGE Percent ' + str(pool['Pool Stale%']))
 	sys.stdout.write(' "Percent accepted" GAUGE Percent ' + str(100.0 - (pool['Pool Rejected%'] + pool['Pool Stale%'])))
-	sys.stdout.write(' "Blocks of work completed" GAUGE Number ' + str(pool['Works']))
-	sys.stdout.write(' "Blocks of work completed /sec" COUNTER64 Number ' + str(pool['Works']))
+	if(pool.has_key('Works')):
+		sys.stdout.write(' "Blocks of work completed" GAUGE Number ' + str(pool['Works']))
+		sys.stdout.write(' "Blocks of work completed /sec" COUNTER64 Number ' + str(pool['Works']))
 	sys.stdout.write("\n")
 
