@@ -1,0 +1,147 @@
+#!/usr/bin/casperjs
+
+var system = require('system');
+var utils = require('utils');
+var fs = require('fs');
+
+// casperjs adds three args to the beginning
+if(system.args.length != 6) {
+	casper.echo('usage: switchercoin username password');
+	phantom.exit(1);
+}
+
+var username = system.args[4];
+var password = system.args[5];
+
+var casper = require('casper').create();
+casper.userAgent('Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31');
+
+casper.on('remote.message', function onRemoteMessage(msg) {
+	this.echo('+++ ' + msg);
+});
+
+casper.start('http://switchercoin.com/', function loadSite() {
+	return true;
+});
+
+casper.then(function login() {
+	this.fill('form#loginForm', {
+		'username' : username,
+		'password' : password
+	}, true);
+});
+
+casper.thenOpen('http://switchercoin.com/accountworkers');
+casper.waitForSelector('html > body > div#hld > div.wrapper > div#hld > div.wrapper > div#siteheader > div#ministats > font', undefined, undefined, 30000);
+casper.waitForSelector('html > body > div#hld > div.wrapper > div#hld > div.wrapper > div#header > ul#nav > div#ministats2 > li.nobg', undefined, undefined, 30000);
+var top_stats;
+var current_timestamp;
+casper.then(function scrapeTopStats() {
+	current_timestamp = Math.round(new Date().getTime() / 1000);
+	top_stats = this.evaluate(function _scrapeTopStats() {
+		var regex_poolhashrate = new RegExp('Pool Hashrate: ([0-9.]+) MH/s');
+		var regex_poolminers = new RegExp('Pool Miners: ([0-9]+)');
+		var regex_poolworkers = new RegExp('Pool Workers: ([0-9]+)');
+		var regex_estpayout = new RegExp('Estimated Per Payout : *([0-9.]+)');
+
+		var topcontainer = document.querySelector('html > body > div#hld > div.wrapper > div#hld > div.wrapper');
+		var topbar = topcontainer.querySelector('div#siteheader > div#ministats > font');
+		var lesstopbar = document.querySelector('div#header > ul#nav > div#ministats2 > li.nobg');
+
+		var data = {
+			'pool_hashrate' : parseFloat(regex_poolhashrate.exec(topbar.innerText)[1]),
+			'miners' : parseInt(regex_poolminers.exec(topbar.innerText)[1]),
+			'workers' : parseInt(regex_poolworkers.exec(topbar.innerText)[1]),
+			'estimated_payout' : parseFloat(regex_estpayout.exec(lesstopbar.innerText)[1])
+		};
+
+		return data;
+	});
+});
+
+casper.waitForSelector('html > body > div#hld > div.wrapper > div#hld > div.wrapper > div.block.withsidebar > div.block_content > div.sidebar > div.block > div.block_content > p > a > b > font', undefined, undefined, 30000);
+var sidebar_stats;
+casper.then(function scrapeSidebar() {
+	sidebar_stats = this.evaluate(function _scrapeSidebar() {
+		var regex_currency_name = new RegExp('^\\s*(.*)\\s+Balance\\s*$');
+		var regex_balance = new RegExp('^\\s*([0-9.]+)\\s*[A-Z]*\\s*$');
+
+		var sidebar = document.querySelector('html > body > div#hld > div.wrapper > div#hld > div.wrapper > div.block.withsidebar > div.block_content > div.sidebar > div.block > div.block_content');
+		var metrics1 = sidebar.querySelectorAll('p > i > b');
+		var metrics2 = sidebar.querySelectorAll('p > a');
+
+		var data = {
+			'hashrate' : parseFloat(metrics1[0].innerText),
+			'balances' : {}
+		};
+
+		for(var i = 0; i < metrics2.length; i++) {
+			var elem = metrics2[i];
+			var name_elem = elem.querySelector('u > b');
+			var balance_elem = elem.querySelector('b i');
+
+			if(!(name_elem && balance_elem)) {
+				continue;
+			}
+
+			var name = regex_currency_name.exec(name_elem.innerText)[1];
+			var balance = regex_balance.exec(balance_elem.innerText)[1];
+
+			data.balances[name] = balance;
+		}
+		return data;
+	});
+});
+
+casper.waitForSelector('html > body > div#hld > div.wrapper > div#hld > div.wrapper > div.block.withsidebar > div.block_content > div.sidebar_content > div.block > div.block_content  > table > tbody > tr', undefined, undefined, 30000);
+var worker_data;
+casper.then(function scrapeWorkers() {
+	worker_data = this.evaluate(function _scrapeWorkers() {
+		var rows = document.querySelectorAll('html > body > div#hld > div.wrapper > div#hld > div.wrapper > div.block.withsidebar > div.block_content > div.sidebar_content > div.block > div.block_content  > table > tbody > tr');
+		var data = {}
+		for(var i = 1; i < rows.length; i++) {
+			var row = rows[i];
+			var cells = row.querySelectorAll('td');
+			var name = cells[0].innerText + cells[0].querySelector('input').value;
+			data[name] = {
+				'active' : (cells[2].innerText == 'N' ? 0 : 1),
+				'hashrate' : parseInt(cells[3].innerText)
+			}
+		}
+		return data;
+	});
+	utils.dump(worker_data);
+});
+
+casper.run(function printAllData() {
+	this.echo(
+		current_timestamp + ' "Switchercoin" "Switchercoin pool" "Pool/network stats"' +
+		' "Pool hashrate" GAUGE Megahash ' + top_stats.pool_hashrate +
+		' "Pool miners" GAUGE Number ' + top_stats.miners +
+		' "Pool workers" GAUGE Number ' + top_stats.workers
+	);
+
+	var account_str =
+		current_timestamp + ' "Switchercoin account: ' + username + '" "Switchercoin account" "Account totals"' +
+		' "Current hashrate" GAUGE Kilohash ' + sidebar_stats.hashrate +
+		' "Estimated earnings this round" GAUGE Litecoin ' + top_stats.estimated_payout
+	;
+
+	for(var currency in sidebar_stats.balances) {
+		account_str += ' "' + currency + ' Balance" GAUGE "' + currency + '" "' + sidebar_stats.balances[currency] + '"';
+	}
+
+	this.echo(account_str);
+
+	for(var name in worker_data) {
+		var worker = worker_data[name];
+		this.echo(
+			current_timestamp + ' "Switchercoin worker: ' + name + '" "Switchercoin worker" "Individual worker"' +
+			' "Active?" GAUGE Number ' + worker.active +
+			' "Hashrate" GAUGE Kilohash ' + worker.hashrate
+		); 
+	}
+	phantom.exit(0);
+});
+
+

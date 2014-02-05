@@ -478,3 +478,18 @@ This processor logs into a We Mine FTC account and scrapes data about the ftc
 network as a whole, the We Mine FTC pool, the user's account, and the user's
 individual workers.
 
+
+
+switchercoin
+============
+* Language:  CasperJS
+* Type:      Screen scraper
+* Reference: http://switchercoin.com/
+* Usage:
+
+
+    switchercoin Username Password
+
+This processor logs into a Switchercoin account and scrapes data about the
+Switchercoin multipool, the user's account, and the user's individual workers.
+
