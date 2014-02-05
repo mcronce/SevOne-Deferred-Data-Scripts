@@ -123,7 +123,8 @@ casper.run(function printAllData() {
 	;
 
 	for(var currency in sidebar_stats.balances) {
-		account_str += ' "' + currency + ' Balance" GAUGE "' + currency + '" "' + sidebar_stats.balances[currency] + '"';
+		account_str += ' "' + currency + ' balance" GAUGE "' + currency + '" "' + sidebar_stats.balances[currency] + '"';
+		account_str += ' "' + currency + ' balance delta/sec" COUNTER64 "Micro' + currency.toLowerCase() + '" "' + (sidebar_stats.balances[currency] * 1000000) + '"';
 	}
 
 	this.echo(account_str);
