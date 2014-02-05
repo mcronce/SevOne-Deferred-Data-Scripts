@@ -76,14 +76,14 @@ casper.then(function scrapeWorkers() {
 	worker_data = this.evaluate(function _scrapeWorkers() {
 		var rows = document.querySelectorAll('html > body > div#hld > div.wrapper > div.block.withsidebar > div.block_content > div.sidebar_content > div.block > div.block_content > center > table > tbody > tr');
 		var data = {}
-		for(var i = 1; i < rows.length; i++) {
+		for(var i = 1; i < rows.length - 1; i++) {
 			var row = rows[i];
 			var cells = row.querySelectorAll('td');
 			var name = cells[0].innerText;
 			var suggestDiffSelect = cells[6].querySelector('select');
 			var maxDiffSelect = cells[7].querySelector('select');
 			data[name] = {
-				'active' : cells[2].innerText == 'N' ? 0 : 1,
+				'active' : (cells[2].innerText == 'N' ? 0 : 1),
 				'hashrate' : parseInt(cells[5].innerText),
 				'suggested_difficulty' : parseInt(suggestDiffSelect.options[suggestDiffSelect.selectedIndex].value),
 				'max_difficulty' : parseInt(maxDiffSelect.options[maxDiffSelect.selectedIndex].value)
