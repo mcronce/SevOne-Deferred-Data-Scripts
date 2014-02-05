@@ -16,10 +16,6 @@ var password = system.args[5];
 var casper = require('casper').create();
 casper.userAgent('Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31');
 
-casper.on('remote.message', function onRemoteMessage(msg) {
-	this.echo('+++ ' + msg);
-});
-
 casper.start('http://switchercoin.com/', function loadSite() {
 	return true;
 });
@@ -110,7 +106,6 @@ casper.then(function scrapeWorkers() {
 		}
 		return data;
 	});
-	utils.dump(worker_data);
 });
 
 casper.run(function printAllData() {
