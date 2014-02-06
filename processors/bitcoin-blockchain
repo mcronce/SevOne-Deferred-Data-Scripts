@@ -1,0 +1,10 @@
+#!/bin/bash
+
+while test $# -gt 0; do
+	address="$1";
+	shift;
+	name="$1";
+	shift;
+	echo "$(date +%s) '$address' 'Bitcoin address' '$name' 'Balance' GAUGE Millibitcoin $(echo -e "scale=5\n$(wget -q -O /dev/stdout https://blockchain.info/q/addressbalance/$address) / 100 / 1000" | bc -q)";
+done;
+

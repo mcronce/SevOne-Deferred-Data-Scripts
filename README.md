@@ -493,3 +493,20 @@ switchercoin
 This processor logs into a Switchercoin account and scrapes data about the
 Switchercoin multipool, the user's account, and the user's individual workers.
 
+
+
+bitcoin-blockchain
+==================
+* Language:  bash
+* Type:      API
+* Reference: https://blockchain.info/
+* Usage:
+
+
+    bitcoin-blockchain address1 "Friendly name 1" [address2 "Friendly name 2" [... addressN "Friendly name N"]]
+
+This processor uses the plain-text API on https://blockchain.info/ to pull the
+BTC balance for a given address on the blockchain.  It can process an arbitrary
+number of addresses per call.  Friendly names are just used as object
+descriptions for SevOne; they can be anything you want.
+
