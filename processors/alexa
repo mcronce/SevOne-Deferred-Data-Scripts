@@ -161,3 +161,7 @@ sys.stdout.write(' "1-month search%" GAUGE Number ' + onemonth)
 sys.stdout.write(' "1-month search% (change%)" GAUGE Percent ' + onemonth_change)
 sys.stdout.write(' "3-month search%" GAUGE Number ' + threemonth)
 sys.stdout.write(' "3-month search% (change%)" GAUGE Percent ' + threemonth_change)
+
+# Trailing newline!
+sys.stdout.write("\n")
+
