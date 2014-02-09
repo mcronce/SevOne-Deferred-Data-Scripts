@@ -510,3 +510,20 @@ BTC balance for a given address on the blockchain.  It can process an arbitrary
 number of addresses per call.  Friendly names are just used as object
 descriptions for SevOne; they can be anything you want.
 
+
+
+wafflepool
+==========
+* Language:  Python
+* Type:      Screen scraper
+* Reference: http://www.wafflepool.com/
+* Usage:
+
+
+    wafflepool btc-address
+
+This processor scrapes a specific miner's statistics from
+http://www.wafflepool.com/ and imports them.  Objects exported by this
+processor are fairly wide, with eight indicators per individual altcoin plus
+some.
+

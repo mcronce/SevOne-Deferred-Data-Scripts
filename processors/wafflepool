@@ -1,0 +1,273 @@
+#!/usr/bin/python2
+# -*- coding: utf-8 -*-
+import calendar
+import lxml.html
+import mechanize
+import re
+import sys
+import time
+from datetime import datetime
+from optparse import OptionParser
+
+# Constants {{{
+regex_number = re.compile('-?[0-9,.]+')
+regex_name_description = re.compile('Stats for ([^ ]+) \(hash: ([^)]+)\)')
+regex_hashrate = re.compile('Hash Rate: ([0-9.]+) kH/s')
+regex_blocksfound = re.compile('Blocks Found: ([0-9]+)')
+regex_bitcoin_sent = re.compile('Bitcoins sent to you: ([0-9.]+)')
+regex_bitcoin_unsent = re.compile('Bitcoins earned \(not yet sent\): ([0-9.]+)')
+regex_bitcoin_unconverted = re.compile('Bitcoins unconverted \(approximate\): ([0-9.]+)')
+regex_shift_shares = re.compile('([0-9]+) / ([0-9]+)')
+
+prefixes = {
+	1.0 : '',
+	1000.0 : 'milli',
+	1000000.0 : 'micro'
+}
+
+unit_conversions = {
+	'42' : 1000000.0,
+	'alphacoin' : 1000.0,
+	'bottlecaps' : 1000.0,
+	'casinocoin' : 1000.0,
+	'chncoin' : 1000.0,
+	'diamond' : 1000000.0,
+	'digitalcoin' : 1000.0,
+	'dogecoin' : 1.0,
+	'earthcoin' : 1000.0,
+	'elacoin' : 1000000.0,
+	'emerald' : 1000.0,
+	'fastcoin' : 1000.0,
+	'franko' : 1000000.0,
+	'grandcoin' : 1000.0,
+	'hobonickels' : 1000000.0,
+	'litecoin' : 1000000.0,
+	'lottocoin' : 1.0,
+	'luckycoin' : 1000.0,
+	'mincoin' : 1000.0,
+	'mooncoin' : 1.0,
+	'netcoin' : 1000.0,
+	'philosopherstone' : 1000.0,
+	'phoenixcoin' : 1000.0,
+	'ronpaulcoin' : 1000000.0,
+	'spots' : 1000000.0,
+	'stablecoin' : 1000.0,
+	'tagcoin' : 1000.0,
+	'worldcoin' : 1000000.0
+}
+# }}}
+
+def get_numbers(string): # {{{
+	numbers = regex_number.findall(string)
+	if(len(numbers) == 0):
+		return ['NULL']
+	
+	for i in xrange(len(numbers)):
+		numbers[i] = numbers[i].replace(',', '')
+	
+	return numbers
+# }}}
+
+def find_first_child(element, tag): # {{{
+	for child in element.iterchildren():
+		if(child.tag == tag):
+			return child
+	return None
+# }}}
+
+def find_all_children(element, tag): # {{{
+	children = []
+	for child in element.iterchildren():
+		if(child.tag == tag):
+			children.append(child)
+	return children
+# }}}
+
+def get_converted_values(coin, converted, unconverted, unconfirmed): # {{{
+	if(coin in unit_conversions.keys()):
+		conversion_factor = unit_conversions[coin]
+		prefix = prefixes[conversion_factor]
+		return ((prefix + coin).capitalize(), float(converted) * conversion_factor, float(unconverted) * conversion_factor, float(unconfirmed) * conversion_factor)
+	return (None, None, None, None)
+# }}}
+
+# Parse command-line arguments {{{
+cmdline = OptionParser(usage = 'usage: %prog btc-address')
+
+(options, args) = cmdline.parse_args()
+if(len(args) != 1):
+	cmdline.print_help()
+	sys.exit(1)
+
+(btc_address,) = args
+# }}}
+
+# Browser setup {{{
+# Initialize the browser
+br = mechanize.Browser()
+
+# Enable some handlers
+br.set_handle_equiv(True)
+br.set_handle_redirect(True)
+br.set_handle_referer(True)
+br.set_handle_robots(False)
+
+# Don't hang on >0 refresh times
+br.set_handle_refresh(mechanize._http.HTTPRefreshProcessor(), max_time = 1)
+
+# Lie, cheat, and steal
+br.addheaders = [('User-agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31 AlexaToolbar/alxg-3.1')]
+# }}}
+
+timestamp = int(calendar.timegm(datetime.utcnow().timetuple()))
+
+# Retrieve the page, parse into an XML document, and find the root of the stuff we care about {{{
+response = br.open('http://www.wafflepool.com/miner/' + btc_address)
+page = lxml.html.fromstring(response.read())
+(big_container,) = page.cssselect('html > body > div#wrapper > div#content')
+big_container_alltext = big_container.text_content()
+# }}}
+
+# Find our name and description {{{
+name_description_h2 = find_first_child(big_container, 'h2')
+match = regex_name_description.match(name_description_h2.text)
+(name, description) = match.groups()
+
+sys.stdout.write(str(timestamp) + ' "' + name + '" "Wafflepool miner" "' + description + '"')
+# }}}
+
+# Get some stats from the top of the page {{{
+match = regex_hashrate.search(big_container_alltext)
+if(match):
+	(hashrate,) = match.groups()
+	sys.stdout.write(' "Hashrate" GAUGE Kilohash ' + hashrate)
+else:
+	sys.stdout.write(' "Hashrate" GAUGE Kilohash NULL')
+
+match = regex_blocksfound.search(big_container_alltext)
+if(match):
+	(blocks_found,) = match.groups()
+	sys.stdout.write(' "Blocks found" GAUGE Number ' + blocks_found)
+else:
+	sys.stdout.write(' "Blocks found" GAUGE Number NULL')
+
+match = regex_bitcoin_sent.search(big_container_alltext)
+if(match):
+	(bitcoin_sent,) = match.groups()
+	sys.stdout.write(' "Millibitcoin paid" GAUGE Millibitcoin ' + str(1000.0 * float(bitcoin_sent)))
+	sys.stdout.write(' "Microbitcoin paid /sec" COUNTER64 Microbitcoin ' + str(1000000.0 * float(bitcoin_sent)))
+else:
+	sys.stdout.write(' "Millibitcoin paid" GAUGE Millibitcoin NULL')
+	sys.stdout.write(' "Microbitcoin paid /sec" COUNTER64 Microbitcoin NULL')
+
+match = regex_bitcoin_unsent.search(big_container_alltext)
+if(match):
+	(bitcoin_unsent,) = match.groups()
+	sys.stdout.write(' "Millibitcoin unpaid" GAUGE Millibitcoin ' + str(1000.0 * float(bitcoin_unsent)))
+	sys.stdout.write(' "Microbitcoin unpaid /sec" COUNTER64 Microbitcoin ' + str(1000000.0 * float(bitcoin_unsent)))
+else:
+	sys.stdout.write(' "Millibitcoin unpaid" GAUGE Millibitcoin NULL')
+	sys.stdout.write(' "Microbitcoin unpaid /sec" COUNTER64 Microbitcoin NULL')
+
+match = regex_bitcoin_unconverted.search(big_container_alltext)
+if(match):
+	(bitcoin_unconverted,) = match.groups()
+	sys.stdout.write(' "Millibitcoin unconverted (estimate)" GAUGE Millibitcoin ' + str(1000.0 * float(bitcoin_unconverted)))
+	sys.stdout.write(' "Microbitcoin unconverted /sec (estimate)" COUNTER64 Microbitcoin ' + str(1000000.0 * float(bitcoin_unconverted)))
+else:
+	sys.stdout.write(' "Millibitcoin unconverted (estimate)" GAUGE Millibitcoin NULL')
+	sys.stdout.write(' "Microbitcoin unconverted /sec (estimate)" COUNTER64 Microbitcoin NULL')
+# }}}
+
+# Parse the blocks found table {{{
+(table,) = big_container.cssselect('div#found_blocks > table')
+first_row = find_first_child(table, 'tr').cssselect('td')
+last_block_time = int(time.mktime(datetime.strptime(first_row[1].text, '%Y-%m-%d %H:%M:%S').timetuple()))
+last_block_value = first_row[3].text
+last_block_valid = (first_row[4].text == 'valid')
+
+sys.stdout.write(' "Time since last block found" GAUGE Seconds ' + str(timestamp - last_block_time))
+sys.stdout.write(' "Last block value" GAUGE Number ' + last_block_value)
+sys.stdout.write(' "Last block valid?" GAUGE Number ' + str(int(last_block_valid)))
+# }}}
+
+# Now get all the individual coin balances {{{
+(table,) = big_container.cssselect('div#coin_balances > table')
+for row in table.iterchildren():
+	if(find_first_child(row, 'td') == None):
+		continue
+
+	cells = row.cssselect('td')
+	coin_name = cells[0].text_content()
+	coin_approx_btc = cells[4].text_content()
+
+	if(coin_name in unit_conversions.keys()):
+		coin_converted = cells[1].text
+		coin_unconverted = cells[2].text
+		coin_unconfirmed = cells[3].text
+		(coin_name, coin_converted, coin_unconverted, coin_unconfirmed) = get_converted_values(coin_name, coin_converted, coin_unconverted, coin_unconfirmed)
+		if(coin_name == None):
+			continue
+		sys.stdout.write(' "' + coin_name + ' converted" GAUGE "' + coin_name + '" ' + str(coin_converted))
+		sys.stdout.write(' "' + coin_name + ' converted /sec" COUNTER64 "' + coin_name + '" ' + str(int(coin_converted)))
+		sys.stdout.write(' "' + coin_name + ' confirmed" GAUGE "' + coin_name + '" ' + str(coin_unconverted))
+		sys.stdout.write(' "' + coin_name + ' confirmed /sec" COUNTER64 "' + coin_name + '" ' + str(int(coin_unconverted)))
+		sys.stdout.write(' "' + coin_name + ' unconfirmed" GAUGE "' + coin_name + '" ' + str(coin_unconfirmed))
+		sys.stdout.write(' "' + coin_name + ' unconfirmed /sec" COUNTER64 "' + coin_name + '" ' + str(int(coin_unconfirmed)))
+		if(coin_approx_btc != ''):
+			sys.stdout.write(' "' + coin_name + ' total unconverted, approximate μBTC" GAUGE "Microbitcoin" ' + str(float(coin_approx_btc) * 1000000.0))
+			sys.stdout.write(' "' + coin_name + ' total unconverted /sec, approximate μBTC" GAUGE "Microbitcoin" ' + str(int(float(coin_approx_btc) * 1000000.0)))
+	elif(coin_name == 'Total'):
+		sys.stdout.write(' "Total unconverted, approximate μBTC" GAUGE Microbitcoin" ' + str(float(coin_approx_btc) * 1000000.0))
+		sys.stdout.write(' "Total unconverted /sec, approximate μBTC" COUNTER64 Microbitcoin" ' + str(float(coin_approx_btc) * 1000000.0))
+# }}}
+
+tables = find_all_children(big_container, 'table')
+
+# Payouts {{{
+table = tables[0]
+for row in table.iterchildren():
+	if(find_first_child(row, 'td') == None):
+		continue
+	
+	cells = row.cssselect('td')
+	last_payout_time = int(calendar.timegm(datetime.strptime(cells[0].text, '%Y-%m-%d %H:%M:%S').timetuple()))
+	last_payout_amount = float(cells[1].text) * 1000.0
+
+	sys.stdout.write(' "Time since last payout" GAUGE Seconds ' + str(timestamp - last_payout_time))
+	sys.stdout.write(' "Last payout amount" GAUGE Millibitcoin ' + str(last_payout_amount))
+	break
+# }}}
+
+# Shifts {{{
+table = tables[1]
+i = 0
+for row in table.iterchildren():
+	if(find_first_child(row, 'td') == None):
+		continue
+	
+	cells = row.cssselect('td')
+	match = regex_shift_shares.match(cells[2].text)
+	(my_shares, total_shares) = match.groups()
+	blocks_found = cells[3].text
+
+	if(i == 0):
+		sys.stdout.write(' "Shares this shift" GAUGE Number ' + my_shares)
+		sys.stdout.write(' "Pool shares this shift" GAUGE Number ' + total_shares)
+		sys.stdout.write(' "Blocks found this shift" GAUGE Number ' + blocks_found)
+	elif(i == 1):
+		last_block_time = int(calendar.timegm(datetime.strptime(cells[1].text, '%Y-%m-%d %H:%M:%S').timetuple()))
+		sys.stdout.write(' "Shares last shift" GAUGE Number ' + my_shares)
+		sys.stdout.write(' "Pool shares last shift" GAUGE Number ' + total_shares)
+		sys.stdout.write(' "Blocks found last shift" GAUGE Number ' + blocks_found)
+		sys.stdout.write(' "Current shift duration" GAUGE Number ' + str(timestamp - last_block_time))
+	elif(i == 2):
+		last_last_block_time = int(calendar.timegm(datetime.strptime(cells[1].text, '%Y-%m-%d %H:%M:%S').timetuple()))
+		sys.stdout.write(' "Last shift duration" GAUGE Number ' + str(last_block_time - last_last_block_time))
+		break
+	
+	i = i + 1
+# }}}
+
+sys.stdout.write("\n")
+
