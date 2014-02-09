@@ -109,9 +109,12 @@ table.pop(0)
 table.pop(0)
 for row in table:
 	cells = row.cssselect('td')
-	name = regex_drop_spectator_tag.match(cells[3].text.encode('utf-8').strip()).group(1)
+	try:
+		name = regex_drop_spectator_tag.match(cells[3].text.encode('utf-8').strip()).group(1)
+	except Exception:
+		name = cells[3].text.encode('utf-8').strip()
 	players[name]['Ping'] = get_numbers(cells[5].text)[0]
-	players[name]['Score'] = get_numbers(cells[6].text)[0]
+	players[name]['Cash'] = get_numbers(cells[6].text)[0]
 	players[name]['Global ID'] = get_numbers(cells[9].text)[0]
 
 # OK, loop through all the players and drop some data
