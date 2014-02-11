@@ -50,6 +50,7 @@ casper.then(function login() {
 	}, true);
 });
 
+casper.waitForSelector('#DisabledSubmitBtn', undefined, undefined, 15000);
 casper.thenOpen('https://rs.alarmnet.com/TotalConnectComfort/Locations', javascriptOnLoad);
 
 var locations = null;
