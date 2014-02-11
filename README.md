@@ -4,6 +4,16 @@ A collection of open-source deferred data scripts for SevOne
 
 
 
+Setup
+=====
+To get any of the adapters going that you haven't run before, run the script
+and pipe it to deferred-data-import, pointed to a SevOne appliance and device
+that you want to have own the objects.  After it completes, discover that
+device within SevOne; after discovery completes, rerun the script again.  You
+should have your first data points on that object.
+
+
+
 deferred-data-import
 ====================
 This is the core script in the collection.  It is agnostic to the data being
