@@ -236,7 +236,20 @@ function report_stats($deviceId, $time, $objectType, $objectName, $objectDescrip
 		$ot = $ot_by_name[$objectType];
 	} else {
 		echo '+++ ot_by_name cache miss ("', $objectType, '")', PHP_EOL;
-		$ot = $client->plugin_deferred_getObjectTypeByOsIdAndName(0, $objectType);
+
+		try {
+			$ot = $client->plugin_deferred_getObjectTypeByOsIdAndName(0, $objectType);
+		} catch(SoapFault $e) {
+			$ots = $client->plugin_deferred_getObjectTypes();
+			$ot = null;
+			foreach($ots as $_ot) {
+				if($_ot->name == $objectType) {
+					$ot = $_ot;
+					break;
+				}
+			}
+		}
+
 		if(!$ot) {
 			$otid = $client->plugin_deferred_createObjectType(0, $objectType);
 			sleep(5);
@@ -276,7 +289,7 @@ function report_stats($deviceId, $time, $objectType, $objectName, $objectDescrip
 			if(array_key_exists("maxValue",$indicator)) {
 				$client->plugin_deferred_setIndicatorTypeHasMaxValue($id, 1);
 			}
-			$indicatorTypes[$indicator["name"]] = $client->plugin_deferred_getIndicatorTypeByObjectTypeIdAndName($ot->id,$indicator["name"]);
+			$indicatorTypes[$indicator["name"]] = $client->plugin_deferred_getIndicatorTypeByObjectTypeIdAndName($ot->id, $indicator["name"]);
 		}
 	}
 
