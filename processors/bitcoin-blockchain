@@ -5,6 +5,6 @@ while test $# -gt 0; do
 	shift;
 	name="$1";
 	shift;
-	echo "$(date +%s) '$address' 'Bitcoin address' '$name' 'Balance' GAUGE Millibitcoin $(echo -e "scale=5\n$(wget -q -O /dev/stdout https://blockchain.info/q/addressbalance/$address) / 100 / 1000" | bc -q)";
+	echo "$(date +%s) '$address' 'Bitcoin address' '$name' 'Balance' GAUGE Millibitcoin $(echo -e "scale=5\n$(wget -q -O /dev/stdout -U 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31' https://blockchain.info/q/addressbalance/$address) / 100 / 1000" | bc -q)";
 done;
 
