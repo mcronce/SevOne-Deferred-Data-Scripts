@@ -122,7 +122,7 @@ br.addheaders = [('User-agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit
 timestamp = int(calendar.timegm(datetime.utcnow().timetuple()))
 
 # Retrieve the page, parse into an XML document, and find the root of the stuff we care about {{{
-response = br.open('http://www.wafflepool.com/miner/' + btc_address)
+response = br.open('http://wafflepool.com/miner/' + btc_address)
 page = lxml.html.fromstring(response.read())
 (big_container,) = page.cssselect('html > body > div#wrapper > div#content')
 big_container_alltext = big_container.text_content()
@@ -181,14 +181,20 @@ else:
 
 # Parse the blocks found table {{{
 (table,) = big_container.cssselect('div#found_blocks > table')
-first_row = find_first_child(table, 'tr').cssselect('td')
-last_block_time = int(time.mktime(datetime.strptime(first_row[1].text, '%Y-%m-%d %H:%M:%S').timetuple()))
-last_block_value = first_row[3].text
-last_block_valid = (first_row[4].text == 'valid')
+first_row = find_first_child(table, 'tr')
+if(first_row == None):
+	sys.stdout.write(' "Time since last block found" GAUGE Seconds NULL')
+	sys.stdout.write(' "Last block value" GAUGE Number NULL')
+	sys.stdout.write(' "Last block valid?" GAUGE Number NULL')
+else:
+	first_row = first_row.cssselect('td')
+	last_block_time = int(time.mktime(datetime.strptime(first_row[1].text, '%Y-%m-%d %H:%M:%S').timetuple()))
+	last_block_value = first_row[3].text
+	last_block_valid = (first_row[4].text == 'valid')
 
-sys.stdout.write(' "Time since last block found" GAUGE Seconds ' + str(timestamp - last_block_time))
-sys.stdout.write(' "Last block value" GAUGE Number ' + last_block_value)
-sys.stdout.write(' "Last block valid?" GAUGE Number ' + str(int(last_block_valid)))
+	sys.stdout.write(' "Time since last block found" GAUGE Seconds ' + str(timestamp - last_block_time))
+	sys.stdout.write(' "Last block value" GAUGE Number ' + last_block_value)
+	sys.stdout.write(' "Last block valid?" GAUGE Number ' + str(int(last_block_valid)))
 # }}}
 
 # Now get all the individual coin balances {{{
