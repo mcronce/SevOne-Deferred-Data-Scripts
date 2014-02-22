@@ -135,6 +135,16 @@ casper.then(function scrapeLocationDetails() {
 									var scheduleStatus = container.querySelector('div#ScheduledStatus > div#ScheduledStatusHdr');
 									var fanButtons = container.querySelector('div#FanSystemButtons');
 
+									var tempControls = container.querySelector('div#NonAutoModeTempControls');
+									var targetTemp;
+									if(tempControls.querySelector('div#NonAutoHeatSetpt').style.display != 'none') {
+										targetTemp = tempControls.querySelector('div#NonAutoHeatSetpt > div.SetPtContainer > div.CurrentSetpt > div.DisplayValue').innerText.replace(re.trim, '');
+									} else if(tempControls.querySelector('div#NonAutoCoolSetpt').style.display != 'none') {
+										targetTemp = tempControls.querySelector('div#NonAutoCooLSetpt > div.SetPtContainer > div.CurrentSetpt > div.DisplayValue').innerText.replace(re.trim, '');
+									} else {
+										targetTemp = 'NULL';
+									}
+
 									var stats = {
 										'state_heat'    : $(systemButtons.querySelector('div#HeatBtn')).hasClass('SystemButtonOn') ? 1 : 0,
 										'state_cool'    : $(systemButtons.querySelector('div#CoolBtn')).hasClass('SystemButtonOn') ? 1 : 0,
@@ -144,7 +154,7 @@ casper.then(function scrapeLocationDetails() {
 										'indoor_humid'  : indoorDisplay.querySelector('div.IndoorHumidity > div.IndoorHumidityDisplay > div.DisplayValue').innerText.replace(re.trim, ''),
 										'outdoor_temp'  : outdoorDisplay.querySelector('div.OutdoorTempDisplay > div.DisplayValue').innerText.replace(re.trim, ''),
 										'outdoor_humid' : outdoorDisplay.querySelector('div.OutdoorHumidityDisplay > div.DisplayValue').innerText.replace(re.trim, ''),
-										'target_temp'   : container.querySelector('div#NonAutoModeTempControls > div#NonAutoHeatSetpt > div.SetPtContainer > div.CurrentSetpt > div.DisplayValue').innerText.replace(re.trim, ''),
+										'target_temp'   : targetTemp,
 										'sched_status'  : scheduleStatus.innerText.replace(re.trim, '') == 'Following Schedule' ? 1 : 0,
 										'fan_on'        : $(fanButtons.querySelector('div#FanOnBtn')).hasClass('FanSystemButtonOn') ? 1 : 0,
 										'fan_auto'      : $(fanButtons.querySelector('div#FanAutoBtn')).hasClass('FanSystemButtonOn') ? 1 : 0,
@@ -167,7 +177,7 @@ casper.run(function exitHappy() {
 	for(var i = 0; i < locations.length; i++) {
 		for(var j = 0; j < locations[i].thermostats.length; j++) {
 			var stat = locations[i].thermostats[j].stats;
-			this.echo(timestamp + ' "' + locations[i].name + ' - ' + locations[i].thermostats[j].name + '" "Honeywell thermostat" "Thermostat data" "System heating?" GAUGE Number ' + stat.state_heat + ' "System cooling?" GAUGE Number ' + stat.state_cool + ' "System off?" GAUGE Number ' + stat.state_off + ' "System emergency heating?" GAUGE Number ' + stat.state_emheat + ' "Indoor temperature" GAUGE "Degrees F" ' + stat.indoor_temp + ' "Indoor humidity" GAUGE Percent ' + stat.indoor_humid + ' "Outdoor temperature" GAUGE "Degrees F" ' + stat.outdoor_temp + ' "Outdoor humidity" GAUGE Percent ' + stat.outdoor_humid + ' "Target tmperature" GAUGE "Degrees F" ' + stat.target_temp + ' "Following schedule?" GAUGE Number ' + stat.sched_status + ' "Fan on?" GAUGE Number ' + stat.fan_on + ' "Fan auto?" GAUGE Number ' + stat.fan_auto + ' "Fan circulate?" GAUGE Number ' + stat.fan_circulate + ' "Fan following schedule?" GAUGE Number ' + 1);
+			this.echo(timestamp + ' "' + locations[i].name + ' - ' + locations[i].thermostats[j].name + '" "Honeywell thermostat" "Thermostat data" "System heating?" GAUGE Number ' + stat.state_heat + ' "System cooling?" GAUGE Number ' + stat.state_cool + ' "System off?" GAUGE Number ' + stat.state_off + ' "System emergency heating?" GAUGE Number ' + stat.state_emheat + ' "Indoor temperature" GAUGE "Degrees F" ' + stat.indoor_temp + ' "Indoor humidity" GAUGE Percent ' + stat.indoor_humid + ' "Outdoor temperature" GAUGE "Degrees F" ' + stat.outdoor_temp + ' "Outdoor humidity" GAUGE Percent ' + stat.outdoor_humid + ' "Target temperature" GAUGE "Degrees F" ' + stat.target_temp + ' "Following schedule?" GAUGE Number ' + stat.sched_status + ' "Fan on?" GAUGE Number ' + stat.fan_on + ' "Fan auto?" GAUGE Number ' + stat.fan_auto + ' "Fan circulate?" GAUGE Number ' + stat.fan_circulate + ' "Fan following schedule?" GAUGE Number ' + 1);
 		}
 	}
 	phantom.exit(0);
