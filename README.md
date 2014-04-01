@@ -29,6 +29,9 @@ Data input should follow this format:
 
 	"timestamp" "object name" "object type" "object description" ["indicator name 1" "indicator format 1" "indicator units 1" "indicator value 1" ["indicator name 2" "indicator format 2" "indicator units 2" "indicator value 2" [... etc]]]
 
+Note that the units can be just a single unit for both measurement and display,
+or it can be of the format "measurement units//display units"
+
 "Indicator format" refers to "GAUGE", "COUNTER32", or "COUNTER64".  Most of
 what you import via Deferred Data will be GAUGE.  Refer to the SevOne manual
 for more information.  It does attempt to use quotes to allow spaces in text

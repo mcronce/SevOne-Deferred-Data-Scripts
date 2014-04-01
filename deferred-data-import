@@ -88,6 +88,7 @@ define('SO_PARSE_MODE_INQUOTE_SINGLE', 1);
 define('SO_PARSE_MODE_INQUOTE_DOUBLE', 2);
 // We are expecting:
 //    "timestamp" "object name" "object type" "object description" ["indicator name 1" "indicator format 1" "indicator units 1" "indicator value 1" ["indicator name 2" "indicator format 2" "indicator units 2" "indicator value 2" [... etc]]]
+// Note that the units can be just a single unit for both measurement and display, or it can be of the format "measurement units//display units"
 function split_data_line($line) { // {{{
 	//$parts = preg_split('/(\s+|\'|")/', $line, -1, PREG_SPLIT_DELIM_CAPTURE);
 	$parts = preg_split('/(\s+)/', $line, -1, PREG_SPLIT_DELIM_CAPTURE);
@@ -181,10 +182,20 @@ function parse_data_line($line) { // {{{
 		);
 	}
 
-	foreach($output['indicators'] as $i => $indicator) {
+	foreach($output['indicators'] as $i => &$indicator) {
 		if(!in_array($indicator['type'], array('GAUGE', 'COUNTER32', 'COUNTER64'))) {
 			echo '!!! Indicator number ', $i, ' for object "', $output['object_name'], '" at time "', $original_time, '" had invalid format "', $indicator['type'], '"', PHP_EOL;
 			return false;
+		}
+		$matches = null;
+		if(preg_match(':(.+)//(.+):', $indicator['units'], $matches)) {
+			$indicator['data_units'] = $matches[1];
+			$indicator['display_units'] = $matches[2];
+			unset($indicator['units']);
+		} else {
+			$indicator['data_units'] = $indicator['units'];
+			$indicator['display_units'] = $indicator['units'];
+			unset($indicator['units']);
 		}
 	}
 
@@ -210,7 +221,8 @@ function parse_data_line($line) { // {{{
 		// The following are optional
 		"type" => "<indicator type>",
 		"maxValue" => "<indicator Max Value>",
-		"units" => "<Units for this indicator>"
+		"data_units" => "<Units in which this indicator is measured>"
+		"display_units" => "<Units in which this indicator is displayed>"
 	)
 
 	@return None
@@ -257,8 +269,10 @@ function report_stats($deviceId, $time, $objectType, $objectName, $objectDescrip
 			if(array_key_exists("type", $indicator)) {
 				$client->plugin_deferred_setIndicatorTypeFormat($id, $indicator['type']);
 			}
-			if(array_key_exists("units", $indicator)) {
-				$client->plugin_deferred_setIndicatorTypeUnits($id, $indicator["units"]);
+			if(array_key_exists('data_units', $indicator) && array_key_exists('display_units', $indicator)) {
+				$client->plugin_deferred_setIndicatorTypeUnits($id, $indicator['data_units'], $indicator['display_units']);
+			} elseif(array_key_exists('data_units', $indicator)) {
+				$client->plugin_deferred_setIndicatorTypeUnits($id, $indicator['data_units']);
 			}
 			if(array_key_exists("maxValue",$indicator)) {
 				$client->plugin_deferred_setIndicatorTypeHasMaxValue($id, 1);
