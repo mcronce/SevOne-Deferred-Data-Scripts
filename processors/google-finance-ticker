@@ -1,0 +1,97 @@
+#!/usr/bin/python2.7
+
+import datetime
+import json
+from optparse import OptionParser
+import socket
+import sys
+import time
+import urllib
+import urllib2
+
+# constants {{{
+suffixes = {
+	'K' : 1000,
+	'M' : 1000000,
+	'B' : 1000000000,
+	'T' : 1000000000000
+}
+# }}}
+
+def get_timestamp(): # {{{
+	return str(int(time.mktime(datetime.datetime.now().timetuple())))
+# }}}
+
+# CLEVERLY NAMED function to retrieve a remote URL
+def curl(url, data = None): # {{{
+	req = urllib2.Request(url)
+
+	if(data != None):
+		req.add_data(urllib.urlencode(data))
+
+	try:
+		handle = urllib2.urlopen(req)
+	except IOError, e:
+		return ''
+	
+	data = handle.read().replace('//', '')
+	return data 
+# }}}
+
+def curlJson(url, data = None): # {{{
+	jsonSuccess = False
+	failCount = 0
+	while(failCount < 5 and not jsonSuccess):
+		try:
+			daters = json.loads(curl(url, data))
+			jsonSuccess = True
+		except:
+			#print 'derped. herping again'
+			failCount = failCount + 1
+			jsonSuccess = False
+	if(failCount >= 5):
+		sys.exit(1)
+	return daters
+# }}}
+
+def process_suffixed_number(number): # {{{
+	last_character = number[-1:]
+	for suffix in suffixes.iterkeys():
+		if(suffix == last_character):
+			number = float(number[:-1]) * suffixes[suffix]
+	return number
+# }}}
+
+# parse command-line arguments {{{
+cmdline = OptionParser(usage = 'usage: %prog [options] [EXCHANGE:]SYMBOL')
+
+(options, args) = cmdline.parse_args()
+if(len(args) != 1):
+	cmdline.print_help()
+	sys.exit(1)
+
+(symbol,) = args
+# }}} 
+
+google_data = curlJson('http://www.google.com/finance/info?infotype=infoquoteall&q=' + symbol)
+timestamp = get_timestamp()
+for datum in google_data:
+	sys.stdout.write(timestamp + ' "' + datum['t'] + '" "Google Finance ticker" "' + datum['name'] + ' on ' + datum['e'] + '"')
+	sys.stdout.write(' "Price per share" GAUGE Cents ' + str(float(datum['l']) * 100))
+	sys.stdout.write(' "Change since open" GAUGE Cents ' + str(float(datum['c']) * 100))
+	sys.stdout.write(' "Change since open (Percent)" GAUGE Centipercent ' + str(float(datum['cp']) * 100))
+	sys.stdout.write(' "Daily open" GAUGE Cents ' + str(float(datum['op']) * 100))
+	sys.stdout.write(' "Daily high" GAUGE Cents ' + str(float(datum['hi']) * 100))
+	sys.stdout.write(' "Daily low" GAUGE Cents ' + str(float(datum['lo']) * 100))
+	sys.stdout.write(' "Daily trade volume (today)" GAUGE Number ' + str(process_suffixed_number(datum['vo'])))
+	sys.stdout.write(' "Daily trade volume (30-day average)" GAUGE Number ' + str(process_suffixed_number(datum['avvo'])))
+	sys.stdout.write(' "52-week high" GAUGE Cents ' + str(float(datum['hi52']) * 100))
+	sys.stdout.write(' "52-week low" GAUGE Cents ' + str(float(datum['lo52']) * 100))
+	sys.stdout.write(' "Market capitalization" GAUGE Cents ' + str(process_suffixed_number(datum['mc']) * 100))
+	sys.stdout.write(' "Price/earnings ratio" GAUGE Cents ' + str(float(datum['pe']) * 100))
+	sys.stdout.write(' "Beta value" GAUGE Centinumber ' + str(float(datum['beta']) * 100))
+	sys.stdout.write(' "Earnings per share" GAUGE Cents ' + str(float(datum['eps']) * 100))
+	sys.stdout.write(' "Outstanding shares" GAUGE Number ' + str(process_suffixed_number(datum['shares'])))
+	sys.stdout.write(' "Institutional ownership" GAUGE Percent ' + datum['inst_own'][:-1])
+	sys.stdout.write("\n")
+

@@ -537,3 +537,21 @@ http://www.wafflepool.com/ and imports them.  Objects exported by this
 processor are fairly wide, with eight indicators per individual altcoin plus
 some.
 
+
+
+google-finance-tracker
+======================
+* Language:  Python
+* Type:      API
+* Reference: http://finance.google.com/
+* Usage:
+
+
+    google-finance-tracker ticker
+    google-finance-tracker [exchange:]ticker
+    google-finance-tracker [exchange1:]ticker1[,[exchange2]:ticker2[... ,[exchangeN]:tickerN]]
+
+This processor uses the Google Finance REST API to pull down information
+for an exchange-traded stock ticker - including current price, volume,
+EPS, P/E, and others.
+
