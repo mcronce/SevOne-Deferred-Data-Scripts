@@ -26,9 +26,11 @@ casper.userAgent('Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML,
 function javascriptOnLoad() {
 	//this.echo(this.getHTML());
 	//$(document).on('site:loaded', function() {
-	YAHOO.util.Event.onDOMReady(function() {
+	//$(window).load(function() {
+	//YAHOO.util.Event.onDOMReady(function() {
+	document.addEventListener("DOMContentLoaded", function() {
 		window.siteLoaded = true;
-	});
+	}, false);
 	return true;
 }
 
@@ -38,7 +40,7 @@ function javascriptLoadedCheck() {
 	}) === true;
 }
 
-casper.start('https://wwws.mint.com/login.event?task=L', function loadMint() {
+casper.start('https://wwws.mint.com/', function loadMint() {
 	this.evaluateOrDie(javascriptOnLoad);
 });
 
@@ -54,27 +56,23 @@ casper.start('https://wwws.mint.com/login.event?task=L', function loadMint() {
 });*/
 
 // This is some debug code that prints out the URL to every single resource that a page loads.
-/*casper.on('resource.received', function onResourceReceived(resource) {
-	this.echo('--- ' + resource.url);
-});*/
+//casper.on('resource.received', function onResourceReceived(resource) { this.echo('--- ' + resource.url); });
 
 // This is some debug code that prints remote (in-page) log statements to the local console.
-/*casper.on('remote.message', function onRemoteMessage(msg) {
-	this.echo('+++ ' + msg);
-});*/
+//casper.on('remote.message', function onRemoteMessage(msg) { this.echo('+++ ' + msg); });
 
-casper.waitFor(javascriptLoadedCheck, undefined, undefined, 15000);
+//casper.waitFor(javascriptLoadedCheck, undefined, undefined, 30000);
 
 casper.then(function login() {
-	this.fill('form#form-login', {
+	this.fill('form#credentials', {
 		'username' : username,
 		'password' : password
 	}, true);
 });
 
-casper.thenEvaluate(javascriptOnLoad);
-casper.waitFor(javascriptLoadedCheck, undefined, undefined, 15000);
-casper.waitForSelector('html > body > div#background-gradient > div#wrapper > div#body-container > div#main > div.page-overview > table', undefined, undefined, 15000);
+//casper.thenEvaluate(javascriptOnLoad);
+//casper.waitFor(javascriptLoadedCheck, undefined, undefined, 30000);
+casper.waitForSelector('#product-view-root > div.productPageContent > div.pageContents > div.overviewPage > table > tbody > tr:nth-child(3) > td:nth-child(1) > div#overview-left-column', undefined, undefined, 15000);
 
 var account_data;
 var current_timestamp;
@@ -95,8 +93,7 @@ casper.then(function scrapeSidebarData() {
 			'account_types' : []
 		};
 
-		var main = document.querySelector('html > body > div#background-gradient > div#wrapper > div#body-container > div#main > div.page-overview > table > tbody > tr');
-		var sidebar = main.querySelector('td.column-left > div#column-left');
+		var sidebar = document.querySelector('div#overview-left-column');
 
 		var accounts = sidebar.querySelector('div#module-accounts > div.module-content');
 		var totals = accounts.querySelector('ul.totals');
