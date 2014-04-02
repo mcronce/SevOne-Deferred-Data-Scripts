@@ -73,6 +73,11 @@ casper.then(function login() {
 //casper.thenEvaluate(javascriptOnLoad);
 //casper.waitFor(javascriptLoadedCheck, undefined, undefined, 30000);
 casper.waitForSelector('#product-view-root > div.productPageContent > div.pageContents > div.overviewPage > table > tbody > tr:nth-child(3) > td:nth-child(1) > div#overview-left-column', undefined, undefined, 15000);
+casper.waitFor(function checkForTotals() {
+	return this.evaluate(function _checkForTotals() {
+		return document.querySelector('div#module-accounts > div.module-content ul.totals > li.asset-total > span.balance').innerHTML.replace(/^\s*|\s*$/g, '') != ''
+	});
+}, undefined, undefined, 15000);
 
 var account_data;
 var current_timestamp;
