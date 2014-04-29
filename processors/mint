@@ -1,360 +1,131 @@
-#!/usr/bin/casperjs
+#!/usr/bin/python3
+import datetime
+import json
+import optparse
+import time
 
-var system = require('system');
-var utils = require('utils');
-var fs = require('fs');
+from libraries.mintapi.mint.api import Mint
 
-// casperjs adds three args to the beginning
-if(system.args.length != 6) {
-	this.echo('usage: mint username password');
-	phantom.exit(1);
-}
+def get_timestamp(): # {{{
+	return str(int(time.mktime(datetime.datetime.now().timetuple())))
+# }}}
 
-String.prototype.toProperCase = function toProperCase() {
-	return this.replace(/\w\S*/g, function _toProperCase(txt) {
-		return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
-	});
-};
+# Parse command-line arguments {{{
+cmdline = optparse.OptionParser(usage = 'usage: %prog [options] email-address password')
 
-var username = system.args[4];
-var password = system.args[5];
+(options, args) = cmdline.parse_args()
+if(len(args) != 2):
+	cmdline.print_help()
+	sys.exit(1)
 
-var casper = require('casper').create();
-casper.userAgent('Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31');
+(user,password,) = args
+# }}}
 
-// looks like we need to do this part to force the onLoad javascript to run?...
-function javascriptOnLoad() {
-	//this.echo(this.getHTML());
-	//$(document).on('site:loaded', function() {
-	//$(window).load(function() {
-	//YAHOO.util.Event.onDOMReady(function() {
-	document.addEventListener("DOMContentLoaded", function() {
-		window.siteLoaded = true;
-	}, false);
-	return true;
-}
+mint = Mint.create(user, password)
 
-function javascriptLoadedCheck() {
-	return this.evaluate(function() {
-		return window.siteLoaded === true;
-	}) === true;
-}
+# Accounts, then totals {{{
+timestamp = get_timestamp()
+accounts = mint.get_accounts(get_detail = True)
+total_assets = 0.0
+total_debt = 0.0
+for account in accounts:
+	if(account['isClosed']):
+		continue
+	
+	if(account['accountType'] == 'bank'):
+		total_assets = total_assets + account['value']
+		print(
+			timestamp,
+			'"Account: ' + account['accountName'] + '"',
+			'"Mint Account: Bank"',
+			'"' + account['fiName'] + '"',
+			'"Value" GAUGE Number ' + str(account['value']),
+			'"Available Cash" GAUGE Number ' + str(account['availableMoney']),
+			'"APY" GAUGE Number ' + str(account['interestRate'] * 100.0),
+			'"Total Fees" GAUGE Number ' + str(account['totalFees'])
+		)
+	elif(account['accountType'] == 'credit'):
+		total_debt = total_debt + account['value']
+		print(
+			timestamp,
+			'"Account: ' + account['accountName'] + '"',
+			'"Mint Account: Credit"',
+			'"' + account['fiName'] + '"',
+			'"Value" GAUGE Number ' + str(account['value']),
+			'"Available Credit" GAUGE Number ' + str(account['availableMoney']),
+			'"Total Credit" GAUGE Number ' + str(account['totalCredit']),
+			'"APR" GAUGE Number ' + str(account['interestRate']),
+			'"Total Fees" GAUGE Number ' + str(account['totalFees'])
+		)
+	elif(account['accountType'] == 'investment'):
+		total_assets = total_assets + account['value']
+		print(
+			timestamp,
+			'"Account: ' + account['accountName'] + '"',
+			'"Mint Account: Investment"',
+			'"' + account['fiName'] + '"',
+			'"Value" GAUGE Number ' + str(account['value']),
+			'"Total Fees" GAUGE Number ' + str(account['totalFees'])
+		)
+	elif(account['accountType'] == 'loan'):
+		account['value'] = -account['value']
+		total_debt = total_debt + account['value']
+		print(
+			timestamp,
+			'"Account: ' + account['accountName'] + '"',
+			'"Mint Account: Loan"',
+			'"' + account['fiName'] + '"',
+			'"Value" GAUGE Number ' + str(account['value']),
+			'"Next Payment" GAUGE Number ' + str(account['dueAmt'])
+		)
+	elif(account['accountType'] in ['real estate', 'vehicle', 'other property']):
+		value = account['value']
+		if(value > 0):
+			total_assets = total_assets + value
+		else:
+			total_debt = total_debt + value
+		print(
+			timestamp,
+			'"Account: ' + account['accountName'] + '"',
+			'"Mint Account: Other"',
+			'"' + account['fiName'] + '"',
+			'"Value" GAUGE Number ' + str(account['value'])
+		)
 
-casper.start('https://wwws.mint.com/', function loadMint() {
-	this.evaluateOrDie(javascriptOnLoad);
-});
+print(
+	timestamp,
+	'"Totals"',
+	'"Mint Totals"',
+	'"Totals"',
+	'"Assets" GAUGE Number ' + str(total_assets),
+	'"Debt" GAUGE Number ' + str(total_debt),
+	'"Net Worth" GAUGE Number ' + str(total_assets + total_debt)
+)
+# }}}
 
-// This is some debug code that overrides some of Mint's libraries with local copies.
-/*casper.on('resource.requested', function onResourceRequested(requestData, networkRequest) {
-	if(requestData.url == 'https://wwws.mint.com/sc/ph4474.7/js/library.js') {
-		networkRequest.changeUrl(fs.workingDirectory + '/debug/mint/library.js');
-	} else if(requestData.url == 'https://wwws.mint.com/sc/ph4474.7/js/summary.js') {
-		networkRequest.changeUrl(fs.workingDirecotry + '/debug/mint/summary.js');
-	} else if(requestData.url == 'https://wwws.mint.com/sc/ph4474.7/js/lib/mint_s_code.js') {
-		networkRequest.changeUrl(fs.workingDirecotry + '/debug/mint/s-code.js');
-	}
-});*/
+timestamp = get_timestamp()
+budgets = mint.get_budgets()
+for direction in budgets:
+	present = None
+	past = None
+	if(direction == 'spend'):
+		present = 'Spend'
+		past = 'Spent'
+	elif(direction == 'income'):
+		present = 'Income'
+		past = 'Earned'
 
-// This is some debug code that prints out the URL to every single resource that a page loads.
-//casper.on('resource.received', function onResourceReceived(resource) { this.echo('--- ' + resource.url); });
+	for budget in budgets[direction]:
+		cat_name = budget['cat']['parent']['name'] + ': ' + budget['cat']['name']
+		print(
+			timestamp,
+			'"Budget: ' + cat_name + '"',
+			'"Mint Budget: ' + present + '"',
+			'"' + cat_name + '"',
+			'"Limit" GAUGE Number ' + str(budget['bgt']),
+			'"' + past + '" GAUGE Number ' + str(budget['amt']),
+			'"Percent ' + past + '" GAUGE Number ' + (str(budget['amt'] / budget['bgt']) if budget['bgt'] != 0 else 'NULL')
+		)
 
-// This is some debug code that prints remote (in-page) log statements to the local console.
-//casper.on('remote.message', function onRemoteMessage(msg) { this.echo('+++ ' + msg); });
-
-//casper.waitFor(javascriptLoadedCheck, undefined, undefined, 30000);
-
-casper.then(function login() {
-	this.fill('form#credentials', {
-		'username' : username,
-		'password' : password
-	}, true);
-});
-
-//casper.thenEvaluate(javascriptOnLoad);
-//casper.waitFor(javascriptLoadedCheck, undefined, undefined, 30000);
-casper.waitForSelector('#product-view-root > div.productPageContent > div.pageContents > div.overviewPage > table > tbody > tr:nth-child(3) > td:nth-child(1) > div#overview-left-column', undefined, undefined, 15000);
-casper.waitFor(function checkForTotals() {
-	return this.evaluate(function _checkForTotals() {
-		return document.querySelector('div#module-accounts > div.module-content ul.totals > li.asset-total > span.balance').innerHTML.replace(/^\s*|\s*$/g, '') != ''
-	});
-}, undefined, undefined, 15000);
-
-var account_data;
-var current_timestamp;
-casper.then(function scrapeSidebarData() {
-	current_timestamp = Math.round(new Date().getTime() / 1000);
-	account_data = this.evaluate(function scrapeSidebarData_local() { // {{{
-		var re = {
-			'fix_minus'       : new RegExp('–', 'g'),
-			'dollar2number'   : new RegExp('[$,]', 'g'),
-			'sidebarHeader'   : new RegExp('^.*<a[^>]*>[^<]*</a>\s*<span[^>]*>\s*([^<]+)\s*</span>\s*([^<]+).*$'),
-			'accountId'       : new RegExp('^.*accountId=([0-9]+)\s*$'),
-			'accountCategory' : new RegExp('^moduleAccounts-([a-z]+)$')
-		};
-
-		var return_data = {
-			'timestamp'     : null,
-			'totals'        : null,
-			'account_types' : []
-		};
-
-		var sidebar = document.querySelector('div#overview-left-column');
-
-		var accounts = sidebar.querySelector('div#module-accounts > div.module-content');
-		var totals = accounts.querySelector('ul.totals');
-		return_data.totals = {
-			'assets'        : totals.querySelector('li.asset-total > span.balance').innerHTML.replace(re.dollar2number, '').replace(re.fix_minus, '-'),
-			'debt'          : totals.querySelector('li.debt-total > span.balance').innerHTML.replace(re.dollar2number, '').replace(re.fix_minus, '-'),
-			'net_worth'     : totals.querySelector('li.net-worth > span.balance').innerHTML.replace(re.dollar2number, '').replace(re.fix_minus, '-')
-		};
-
-		var accountTypeTags = sidebar.querySelectorAll('ul > li.moduleAccount');
-		for(var i = 0; i < accountTypeTags.length; i++) {
-			var accountTypeTag = accountTypeTags[i];
-			var accountTypeStr = accountTypeTag.querySelector('h3').innerHTML;
-			var accountCategory = accountTypeTag.getAttribute('id').replace(re.accountCategory, '$1')
-
-			var account_type = {
-				'name'     : accountTypeStr.replace(re.sidebarHeader, '$2'),
-				'value'    : accountTypeTag.querySelector('span.balance').innerHTML.replace(re.dollar2number, '').replace(re.fix_minus, '-'),
-				'accounts' : []
-			};
-
-			var accountTags = accountTypeTags[i].querySelectorAll('ul.accounts-list > li.accounts-data-li');
-			for(var j = 0; j < accountTags.length; j++) {
-				var accountTag = accountTags[j];
-				var accountStr = accountTag.innerHTML;
-
-				var id = accountTag.querySelector('h4 > a.accountName').getAttribute('href').replace(re.accountId, '$1');
-				var name = accountTag.querySelector('h4 > a.accountName').innerText;
-
-				if(id == 'javascript://') {
-					id = name;
-				}
-
-				var account = {
-					'id'       : id,
-					'name'     : name,
-					'nickname' : accountTag.querySelector('h6 > span.nickname').innerText,
-					'category' : accountCategory == 'property' ? 'other' : accountCategory,
-					'value'    : accountTag.querySelector('h4 > span.balance').innerText.replace(re.dollar2number, '').replace(re.fix_minus, '-'),
-					'meta'     : []
-					// Not bothering with last updated, at least for now.
-					//'last-updated' : accountTag.querySelector('h6 > span.last-updated').innerText
-				};
-
-				if(account.category == 'other') {
-					var name = account.nickname;
-					account.nickname = account.name;
-					account.name = name;
-				}
-				
-				account_type.accounts.push(account);
-			}
-
-			return_data.account_types.push(account_type);
-		}
-
-		return return_data;
-	/* }}} */});
-	account_data.timestamp = current_timestamp;
-});
-
-function findAccount(id) {
-	for(var i = 0; i < account_data.account_types.length; i++) {
-		var type = account_data.account_types[i];
-		for(var j = 0; j < type.accounts.length; j++) {
-			if(type.accounts[j].id == id) {
-				return [i, j];
-			}
-		}
-	}
-	return null;
-}
-
-var account_meta = {};
-casper.then(function scheduleScrapingTransactionPages() {
-	for(var i = 0; i < account_data.account_types.length; i++) {
-		var type = account_data.account_types[i];
-		for(var j = 0; j < type.accounts.length; j++) {
-			var account = type.accounts[j];
-			if(/^[0-9]+$/.test(account.id)) {
-				casper.thenOpen('https://wwws.mint.com/transaction.event?accountId=' + account.id);
-				casper.waitForSelector('div#account-table > div#account-summary > table.account > tbody', undefined, undefined, 15000);
-				casper.then(function scrapeTransactionPage() {
-					var accountId = this.getCurrentUrl().replace(new RegExp('^.*accountId=([0-9]+).*$'), '$1');
-
-					account_meta[accountId] = this.evaluate(function scrapeTransactionPage_local() { // {{{
-						var re = {
-							'trim'           : new RegExp('^\s*|\s*$', 'g'),
-							'fix_minus'      : new RegExp('–', 'g'),
-							'dollar2number'  : new RegExp('[$,]+', 'g'),
-							'percent2number' : new RegExp('[%]+', 'g'),
-							'account_type'   : new RegExp('^account-table-([a-z]+).*$')
-						};
-
-						var root = document.querySelector('div#account-table');
-
-						var account_metadata = {
-							'name'        : root.querySelector('div.account-header > h1').getAttribute('title'),
-							'nickname'    : root.querySelector('div.account-header > h2').getAttribute('title'),
-							'specifics'   : []
-						}
-
-						var metaTable = root.querySelector('div#account-summary > table.account > tbody');
-						var metaCells = [];
-						var category;
-						if(!metaTable) {
-							category = 'other';
-						} else {
-							category = metaTable.getAttribute('id').replace(re.account_type, '$1');
-							metaCells = metaTable.querySelectorAll('tr > td.money');
-						}
-
-						if(['bank', 'credit', 'loan', 'investment', 'other'].indexOf(category) == -1) {
-							category = '!other';
-						}
-
-						switch(category) {
-							case 'bank':
-								account_metadata.specifics = [
-									{'name' : 'Available Cash', 'value' : metaCells[1].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-')},
-									{'name' : 'APY', 'value' : metaCells[2].innerText.replace(re.trim, '').replace(re.percent2number, '').replace(re.fix_minus, '-')},
-									{'name' : 'Total Fees', 'value' : metaCells[3].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-')}
-								];
-								break;
-							case 'credit':
-								account_metadata.specifics = [
-									{'name' : 'Available Credit', 'value' : parseFloat(metaCells[1].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-'))},
-									{'name' : 'Total Credit', 'value' : parseFloat(metaCells[2].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-'))},
-									{'name' : 'APR', 'value' : parseFloat(metaCells[3].innerText.replace(re.trim, '').replace(re.percent2number, '').replace(re.fix_minus, '-'))},
-									{'name' : 'Total Fees', 'value' : metaCells[4].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-')}
-								];
-								break;
-							case 'loan':
-								account_metadata.specifics = [
-									{'name' : 'Next Payment', 'value' : metaCells[1].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-')}
-								];
-								break;
-							case 'investment':
-								account_metadata.specifics = [
-									{'name' : 'Total Fees', 'value' : metaCells[2].innerText.replace(re.trim, '').replace(re.dollar2number, '').replace(re.fix_minus, '-')}
-								];
-								break;
-						}
-
-						return account_metadata;
-					/* }}} */});
-				});
-			}
-		}
-	}
-});
-
-var budget_data = [];
-casper.thenOpen('https://wwws.mint.com/planning.event');
-casper.waitForSelector('ul.planning_items#incomeBudget-list-body');
-casper.waitForSelector('ul.planning_items#spendingBudget-list-body');
-casper.then(function scrapeBudgetPage() {
-	budget_data = this.evaluate(function scrapeBudgetPage_local() {
-		var re = {
-			'dollar2number' : new RegExp('[$,]', 'g')
-		};
-
-		var budgetData = {
-			'timestamp' : Math.round(new Date().getTime() / 1000),
-			'budgets'   : []
-		};
-
-		var budgetTags = document.querySelectorAll('ul.planning_items#spendingBudget-list-body > li');
-		for(var i = 0; i < budgetTags.length; i++) {
-			var budgetTag = budgetTags[i];
-			var valueTags = budgetTag.querySelector('div > div.progress').querySelectorAll('strong');
-			var datum = {
-				'name'    : budgetTag.querySelector('a.title').innerText,
-				'type'    : 'Spend',
-				'spent'   : valueTags[0].innerText.replace(re.dollar2number, ''),
-				'limit'   : valueTags[1].innerText.replace(re.dollar2number, ''),
-				'percent' : 0
-			};
-			datum.percent = datum.limit == 0 ? 0 : ((datum.spent / datum.limit) * 100);
-			budgetData.budgets.push(datum);
-		}
-
-		return budgetData;
-	});
-});
-
-// Finally, refresh the accounts.
-casper.thenOpen('https://wwws.mint.com/overview.event');
-casper.waitForSelector('a#module-accounts-update');
-casper.thenClick('a#module-accounts-update');
-//casper.waitForSelector('a#module-edit-trigger');
-//casper.thenClick('a#module-edit-trigger');
-
-casper.run(function printAllData() {
-	// Currently, this doesn't work.  I suspect because of some obscure rule about writing to global variables from function scope in Javascript.
-	// For the time being, the metadata and account data are being correlated inline in the display code.  I hate it.
-
-	// Incorporate account metadata {{{
-	/*var local_account_data = account_data;
-	for(var accountId in account_meta) {
-		var index = findAccount(accountId);
-		var account = local_account_data.account_types[index[0]].accounts[index[1]];
-
-		account.category = account_meta[accountId].category;
-		account.meta = account_meta[accountId].specifics;
-		utils.dump(account);
-		local_account_data.account_types[index[0]].accounts[index[1]] = account;
-		utils.dump(local_account_data.account_types[index[0]].accounts[index[1]]);
-		this.echo('------------');
-	}
-	account_data = local_account_data;
-	utils.dump(account_data);*/
-	// }}}
-
-	// Print account data {{{
-	this.echo(account_data.timestamp + ' "Totals" "Mint Totals" "Totals" "Assets" GAUGE Number ' + account_data.totals.assets + ' "Debt" GAUGE Number ' + account_data.totals.debt + ' "Net Worth" GAUGE Number ' + account_data.totals.net_worth);
-	for(var i = 0; i < account_data.account_types.length; i++) {
-		var account_type = account_data.account_types[i];
-		for(var j = 0; j < account_type.accounts.length; j++) {
-			var account = account_type.accounts[j];
-			var account_string = account_data.timestamp;
-			var meta;
-			if(/^[0-9]+$/.test(account.id)) {
-				meta = account_meta[account.id].specifics;
-			} else {
-				meta = []
-			}
-			
-			account_string += ' "Account: ' + account.nickname + '" "Mint Account: ' + account.category.toProperCase() + '" "' + account.name + '"';
-			account_string += ' "Value" GAUGE Number ' + account.value;
-
-			for(var k = 0; k < meta.length; k++) {
-				account_string += ' "' + meta[k].name + '" GAUGE Number ' + meta[k].value;
-			}
-
-			this.echo(account_string);
-		}
-	}
-	// }}}
-
-	// Print budget data {{{
-	for(var i = 0; i < budget_data.budgets.length; i++) {
-		// Sometimes we don't manage to retrieve (or store, or something) budget data from the budgets page.
-		// We'll have to figure out the root cause and fix it but for not, just skipping if we failed prevents garbage from reaching SevOne.
-		if(!budget_data.budgets[i].name) {
-			continue;
-		}
-
-		var budget_string = budget_data.timestamp + ' "Budget: ' + budget_data.budgets[i].name + '" "Mint Budget: ' + budget_data.budgets[i].type + '" "' + budget_data.budgets[i].name + '"';
-		budget_string += ' "Limit" GAUGE Number ' + budget_data.budgets[i].limit;
-		budget_string += ' "Spent" GAUGE Number ' + budget_data.budgets[i].spent;
-		budget_string += ' "Percent Spent" GAUGE Percent ' + budget_data.budgets[i].percent;
-		this.echo(budget_string);
-	}
-	// }}}
-
-	phantom.exit(0);
-});
+mint.initiate_account_refresh()
 

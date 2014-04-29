@@ -115,8 +115,8 @@ Known issues:
 
 mint
 ====
-* Language:  CasperJS
-* Type:      Screen scraper
+* Language:  Python
+* Type:      Screen scraper + API
 * Reference: http://www.mint.com/
 * Usage:
 
