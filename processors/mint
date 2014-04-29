@@ -2,9 +2,10 @@
 import datetime
 import json
 import optparse
+import sys
 import time
 
-from libraries.mintapi.mint.api import Mint
+from libraries.mintapi.mintapi.api import Mint
 
 def get_timestamp(): # {{{
 	return str(int(time.mktime(datetime.datetime.now().timetuple())))
