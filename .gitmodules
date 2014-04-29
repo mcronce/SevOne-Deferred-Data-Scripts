@@ -1,0 +1,3 @@
+[submodule "processors/libraries/mintapi"]
+	path = processors/libraries/mintapi
+	url = git@github.com:mcronce/mintapi.git
