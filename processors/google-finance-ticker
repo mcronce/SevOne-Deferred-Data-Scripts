@@ -89,7 +89,10 @@ for datum in google_data:
 	sys.stdout.write(' "52-week low" GAUGE Cents ' + str(float(datum['lo52']) * 100))
 	sys.stdout.write(' "Market capitalization" GAUGE Cents ' + str(process_suffixed_number(datum['mc']) * 100))
 	sys.stdout.write(' "Price/earnings ratio" GAUGE Cents ' + str(float(datum['pe']) * 100))
-	sys.stdout.write(' "Beta value" GAUGE Centinumber ' + str(float(datum['beta']) * 100))
+	try:
+		sys.stdout.write(' "Beta value" GAUGE Centinumber ' + str(float(datum['beta']) * 100))
+	except ValueError:
+		sys.stdout.write(' "Beta value" GAUGE Centinumber NULL')
 	sys.stdout.write(' "Earnings per share" GAUGE Cents ' + str(float(datum['eps']) * 100))
 	sys.stdout.write(' "Outstanding shares" GAUGE Number ' + str(process_suffixed_number(datum['shares'])))
 	sys.stdout.write(' "Institutional ownership" GAUGE Percent ' + datum['inst_own'][:-1])
