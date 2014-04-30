@@ -1,0 +1,102 @@
+#!/usr/bin/python2.7
+
+import datetime
+import json
+from optparse import OptionParser
+import socket
+import sys
+import time
+import urllib
+import urllib2
+
+# constants {{{
+UNITS = {
+	'F' : 'Degrees F',
+	'C' : 'Degrees C',
+	'in' : 'Inches of mercury',
+	'mb' : 'Millibar',
+	'mph' : 'Miles per hour',
+	'km/h' : 'Kilometers per hour',
+	'mi' : 'Miles',
+	'km' : 'Kilometers'
+}
+# }}}
+
+# CLEVERLY NAMED function to retrieve a remote URL
+def curl(url, data = None, headers = None): # {{{
+	req = urllib2.Request(url)
+
+	if(headers != None):
+		for key in headers.iterkeys():
+			req.add_header(key, headers[key])
+
+	if(data != None):
+		req.add_data(urllib.urlencode(data))
+
+	try:
+		handle = urllib2.urlopen(req)
+	except IOError, e:
+		return ''
+	
+	data = handle.read().replace('//', '')
+	return data 
+# }}}
+
+def curlJson(url, **kwargs): # {{{
+	jsonSuccess = False
+	failCount = 0
+	while(failCount < 5 and not jsonSuccess):
+		try:
+			daters = curl(url, **kwargs)
+			daters = json.loads(daters)
+			jsonSuccess = True
+		except Exception, e:
+			print e
+			failCount = failCount + 1
+			jsonSuccess = False
+	if(failCount >= 5):
+		sys.exit(1)
+	return daters
+# }}}
+
+def process_suffixed_number(number): # {{{
+	last_character = number[-1:]
+	for suffix in suffixes.iterkeys():
+		if(suffix == last_character):
+			number = float(number[:-1]) * suffixes[suffix]
+	return number
+# }}}
+
+# parse command-line arguments {{{
+cmdline = OptionParser(usage = 'usage: %prog [options] WOEID')
+
+(options, args) = cmdline.parse_args()
+if(len(args) != 1):
+	cmdline.print_help()
+	sys.exit(1)
+
+(woeid,) = args
+# }}} 
+
+#yahoo_data = curlJson('http://query.yahooapis.com/v1/public/yql?q=SELECT * FROM weather.forecast WHERE woeid = ' + woeid, headers = {'Accept' : 'application/json'})
+yahoo_data = curlJson('http://query.yahooapis.com/v1/public/yql?q=SELECT%20*%20FROM%20weather.forecast%20WHERE%20woeid%20=%20' + woeid, headers = {'Accept' : 'application/json'})
+timestamp = int(time.mktime(datetime.datetime.strptime(yahoo_data['query']['created'], '%Y-%m-%dT%H:%M:%SZ').timetuple()))
+time_delta = int(time.mktime(datetime.datetime.fromtimestamp(timestamp).timetuple()) - time.mktime(datetime.datetime.utcfromtimestamp(timestamp).timetuple()))
+
+yahoo_data = yahoo_data['query']['results']['channel']
+units = {
+	'dist' : UNITS[yahoo_data['units']['distance']] + '/Miles',
+	'press' : UNITS[yahoo_data['units']['pressure']] + '/Inches of mercury',
+	'speed' : UNITS[yahoo_data['units']['speed']] + '/Miles per hours',
+	'temp' : UNITS[yahoo_data['units']['temperature']] + '/Degrees F'
+}
+
+location = yahoo_data['location']
+sys.stdout.write(str(timestamp + time_delta) + ' "' + location['city'] + ', ' + location['region'] + ', ' + location['country'] + '" "Yahoo Weather" "Weather"')
+sys.stdout.write(' "Temperature" GAUGE "' + units['temp'] + '" ' + yahoo_data['item']['condition']['temp'])
+sys.stdout.write(' "Wind chill" GAUGE "' + units['temp'] + '" ' + yahoo_data['wind']['chill'])
+sys.stdout.write(' "Wind speed" GAUGE "' + units['speed'] + '" ' + yahoo_data['wind']['speed'])
+sys.stdout.write(' "Humidity" GAUGE "Percent" ' + yahoo_data['atmosphere']['humidity'])
+sys.stdout.write(' "Atmospheric pressure" GAUGE "' + units['press'] + '" ' + yahoo_data['atmosphere']['pressure'])
+sys.stdout.write("\n")
+

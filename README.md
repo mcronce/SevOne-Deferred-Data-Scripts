@@ -558,3 +558,26 @@ This processor uses the Google Finance REST API to pull down information
 for an exchange-traded stock ticker - including current price, volume,
 EPS, P/E, and others.
 
+
+
+yahoo-weather
+=============
+* Language:  Python
+* Type:      API
+* Reference: https://developer.yahoo.com/yql/console/
+* Usage:
+
+
+    yahoo-weather WOEID
+	yahoo-weather 12797352
+
+This processor uses the Yahoo! Weather REST API to gather information about
+the weather in a given location.
+
+You must pass it a WOEID, which is a unique number assigned to a specific
+location on Earth - WOEID stands for "Where On Earth IDentifier".  The example
+WOEID, 12797352, is assigned to Newark, CA, United States.
+
+To look up the WOEID for a location, you can use a third-party tool found at
+the following URL:  http://woeid.rosselliot.co.nz/
+
