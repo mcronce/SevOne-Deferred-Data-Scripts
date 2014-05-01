@@ -92,7 +92,7 @@ units = {
 }
 
 location = yahoo_data['location']
-sys.stdout.write(str(timestamp + time_delta) + ' "' + location['city'] + ', ' + location['region'] + ', ' + location['country'] + '" "Yahoo Weather" "Weather"')
+sys.stdout.write(str(timestamp + time_delta) + ' "' + location['city'] + (', ' + location['region'] if location['region'] else '') + ', ' + location['country'] + '" "Yahoo Weather" "Weather"')
 sys.stdout.write(' "Temperature" GAUGE "' + units['temp'] + '" ' + yahoo_data['item']['condition']['temp'])
 sys.stdout.write(' "Wind chill" GAUGE "' + units['temp'] + '" ' + yahoo_data['wind']['chill'])
 sys.stdout.write(' "Wind speed" GAUGE "' + units['speed'] + '" ' + yahoo_data['wind']['speed'])
