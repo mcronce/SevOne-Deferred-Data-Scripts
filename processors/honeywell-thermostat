@@ -140,7 +140,7 @@ casper.then(function scrapeLocationDetails() {
 									if(tempControls.querySelector('div#NonAutoHeatSetpt').style.display != 'none') {
 										targetTemp = tempControls.querySelector('div#NonAutoHeatSetpt > div.SetPtContainer > div.CurrentSetpt > div.DisplayValue').innerText.replace(re.trim, '');
 									} else if(tempControls.querySelector('div#NonAutoCoolSetpt').style.display != 'none') {
-										targetTemp = tempControls.querySelector('div#NonAutoCooLSetpt > div.SetPtContainer > div.CurrentSetpt > div.DisplayValue').innerText.replace(re.trim, '');
+										targetTemp = tempControls.querySelector('div#NonAutoCoolSetpt > div.SetPtContainer > div.CurrentSetpt > div.DisplayValue').innerText.replace(re.trim, '');
 									} else {
 										targetTemp = 'NULL';
 									}
