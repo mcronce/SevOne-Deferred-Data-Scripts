@@ -581,3 +581,20 @@ WOEID, 12797352, is assigned to Newark, CA, United States.
 To look up the WOEID for a location, you can use a third-party tool found at
 the following URL:  http://woeid.rosselliot.co.nz/
 
+
+
+owncloud
+========
+* Language:  Python
+* Type:      Local filesystem
+* Reference: http://www.owncloud.com/
+* Usage:
+
+
+    owncloud /path/to/owncloud/install
+	owncloud /usr/share/webapps/owncloud
+
+This processor looks at individual users' directories within an Owncloud data
+directory; it provides statistics about number and size of files/directories
+active, in trash, in version control, in cache, and in the gallery.
+
