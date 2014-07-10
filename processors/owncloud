@@ -63,12 +63,38 @@ for item in os.listdir(path):
 	if(os.path.isdir(fq_item)):
 		all_paths[item] = fq_item
 
+all_stats = {
+	'current_files_count' : 0,
+	'current_directories_count' : 0,
+	'current_items_count' : 0,
+	'current_files_size' : 0,
+	'current_items_size' : 0,
+	'cache_files_count' : 0,
+	'cache_items_size' : 0,
+	'deleted_files_count' : 0,
+	'deleted_directories_count' : 0,
+	'deleted_files_size' : 0,
+	'deleted_items_size' : 0,
+	'versioned_files_count' : 0,
+	'versioned_directories_count' : 0,
+	'versioned_items_count' : 0,
+	'versioned_files_size' : 0,
+	'versioned_items_size' : 0,
+	'gallery_files_count' : 0,
+	'gallery_directories_count' : 0,
+	'gallery_items_count' : 0,
+	'gallery_files_size' : 0,
+	'gallery_items_size' : 0,
+	'total_size' : 0
+}
+
 # Loop through our users and get information about their files
 for key in all_paths.keys():
 	path = all_paths[key]
+	total_size = 0
 
 	# Throw down our timestamp/object information
-	sys.stdout.write(get_timestamp() + ' "Owncloud user: ' + key + '" "Owncloud user" "Stats for ' + key + '"')
+	sys.stdout.write(get_timestamp() + ' "Owncloud user: ' + key + '" "Owncloud stats" "Stats for ' + key + '"')
 
 	# Get raw file information
 	stats = get_stats(path, 'files')
@@ -77,11 +103,20 @@ for key in all_paths.keys():
 	sys.stdout.write(' "Number of filesystem nodes" GAUGE Number//Number ' + str(stats['all_items']))
 	sys.stdout.write(' "Total size of current files" GAUGE Bytes//Kilobytes ' + str(stats['size_files']))
 	sys.stdout.write(' "Total size of current file tree" GAUGE Bytes//Kilobytes ' + str(stats['size_all']))
+	all_stats['current_files_count'] = all_stats['current_files_count'] + stats['files']
+	all_stats['current_directories_count'] = all_stats['current_directories_count'] + stats['directories']
+	all_stats['current_items_count'] = all_stats['current_items_count'] + stats['all_items']
+	all_stats['current_files_size'] = all_stats['current_files_size'] + stats['size_files']
+	all_stats['current_items_size'] = all_stats['current_items_size'] + stats['size_all']
+	total_size = total_size + stats['size_all']
 
 	# Get cache information
 	stats = get_stats(path, 'cache')
 	sys.stdout.write(' "Number of files in cache" GAUGE Number//Number ' + str(stats['files']))
 	sys.stdout.write(' "Total size of cache" GAUGE Bytes//Kilobytes ' + str(stats['size_all']))
+	all_stats['cache_files_count'] = all_stats['cache_files_count'] + stats['files']
+	all_stats['cache_items_size'] = all_stats['cache_items_size'] + stats['size_all']
+	total_size = total_size + stats['size_all']
 
 	# Get deleted files
 	stats = get_stats(path, 'files_trashbin')
@@ -89,6 +124,11 @@ for key in all_paths.keys():
 	sys.stdout.write(' "Number of directories with deleted files" GAUGE Number//Number ' + str(stats['directories']))
 	sys.stdout.write(' "Total size of deleted files" GAUGE Bytes//Kilobytes ' + str(stats['size_files']))
 	sys.stdout.write(' "Total size of deleted files and their directories" GAUGE Bytes//Kilobytes ' + str(stats['size_all']))
+	all_stats['deleted_files_count'] = all_stats['deleted_files_count'] + stats['files']
+	all_stats['deleted_directories_count'] = all_stats['deleted_directories_count'] + stats['directories']
+	all_stats['deleted_files_size'] = all_stats['deleted_files_size'] + stats['size_files']
+	all_stats['deleted_items_size'] = all_stats['deleted_items_size'] + stats['size_all']
+	total_size = total_size + stats['size_all']
 
 	# Get version controlled files
 	stats = get_stats(path, 'files_versions')
@@ -97,6 +137,12 @@ for key in all_paths.keys():
 	sys.stdout.write(' "Number of filesystem nodes in version history" GAUGE Number//Number ' + str(stats['all_items']))
 	sys.stdout.write(' "Total size of files in version history" GAUGE Bytes//Kilobytes ' + str(stats['size_files']))
 	sys.stdout.write(' "Total size of version history" GAUGE Bytes//Kilobytes ' + str(stats['size_all']))
+	all_stats['versioned_files_count'] = all_stats['versioned_files_count'] + stats['files']
+	all_stats['versioned_directories_count'] = all_stats['versioned_directories_count'] + stats['directories']
+	all_stats['versioned_items_count'] = all_stats['versioned_items_count'] + stats['all_items']
+	all_stats['versioned_files_size'] = all_stats['versioned_files_size'] + stats['size_files']
+	all_stats['versioned_items_size'] = all_stats['versioned_items_size'] + stats['size_all']
+	total_size = total_size + stats['size_all']
 
 	# Get images in gallery
 	stats = get_stats(path, 'gallery')
@@ -105,7 +151,56 @@ for key in all_paths.keys():
 	sys.stdout.write(' "Number of filesystem nodes in gallery" GAUGE Number//Number ' + str(stats['all_items']))
 	sys.stdout.write(' "Total size of images in gallery" GAUGE Bytes//Kilobytes ' + str(stats['size_files']))
 	sys.stdout.write(' "Total size of gallery" GAUGE Bytes//Kilobytes ' + str(stats['size_all']))
+	all_stats['gallery_files_count'] = all_stats['gallery_files_count'] + stats['files']
+	all_stats['gallery_directories_count'] = all_stats['gallery_directories_count'] + stats['directories']
+	all_stats['gallery_items_count'] = all_stats['gallery_items_count'] + stats['all_items']
+	all_stats['gallery_files_size'] = all_stats['gallery_files_size'] + stats['size_files']
+	all_stats['gallery_items_size'] = all_stats['gallery_items_size'] + stats['size_all']
+	total_size = total_size + stats['size_all']
+
+	sys.stdout.write(' "Total disk space consumed" GAUGE Bytes//Megabytes ' + str(total_size))
+	all_stats['total_size'] = all_stats['total_size'] + total_size
 
 	# Trailing newline!
 	sys.stdout.write("\n")
+
+# Write down all our aggregated stats
+sys.stdout.write(get_timestamp() + ' "Owncloud instance" "Owncloud stats" "Full Owncloud installation"')
+
+# Raw file information
+sys.stdout.write(' "Number of files" GAUGE Number//Number ' + str(all_stats['current_files_count']))
+sys.stdout.write(' "Number of directories" GAUGE Number//Number ' + str(all_stats['current_directories_count']))
+sys.stdout.write(' "Number of filesystem nodes" GAUGE Number//Number ' + str(all_stats['current_items_count']))
+sys.stdout.write(' "Total size of current files" GAUGE Bytes//Kilobytes ' + str(all_stats['current_files_size']))
+sys.stdout.write(' "Total size of current file tree" GAUGE Bytes//Kilobytes ' + str(all_stats['current_items_size']))
+
+# Cache information
+sys.stdout.write(' "Number of files in cache" GAUGE Number//Number ' + str(all_stats['cache_files_count']))
+sys.stdout.write(' "Total size of cache" GAUGE Bytes//Kilobytes ' + str(all_stats['cache_items_size']))
+
+# Deleted files
+sys.stdout.write(' "Number of files deleted" GAUGE Number//Number ' + str(all_stats['deleted_files_count']))
+sys.stdout.write(' "Number of directories with deleted files" GAUGE Number//Number ' + str(all_stats['deleted_directories_count']))
+sys.stdout.write(' "Total size of deleted files" GAUGE Bytes//Kilobytes ' + str(all_stats['deleted_files_size']))
+sys.stdout.write(' "Total size of deleted files and their directories" GAUGE Bytes//Kilobytes ' + str(all_stats['deleted_items_size']))
+
+# Version controlled files
+sys.stdout.write(' "Number of files in version history" GAUGE Number//Number ' + str(all_stats['versioned_files_count']))
+sys.stdout.write(' "Number of directories with files in version history" GAUGE Number//Number ' + str(all_stats['versioned_directories_count']))
+sys.stdout.write(' "Number of filesystem nodes in version history" GAUGE Number//Number ' + str(all_stats['versioned_items_count']))
+sys.stdout.write(' "Total size of files in version history" GAUGE Bytes//Kilobytes ' + str(all_stats['versioned_files_size']))
+sys.stdout.write(' "Total size of version history" GAUGE Bytes//Kilobytes ' + str(all_stats['versioned_items_size']))
+
+# Images in gallery
+sys.stdout.write(' "Number of images in gallery" GAUGE Number//Number ' + str(all_stats['gallery_files_count']))
+sys.stdout.write(' "Number of directories with images in gallery" GAUGE Number//Number ' + str(all_stats['gallery_directories_count']))
+sys.stdout.write(' "Number of filesystem nodes in gallery" GAUGE Number//Number ' + str(all_stats['gallery_items_count']))
+sys.stdout.write(' "Total size of images in gallery" GAUGE Bytes//Kilobytes ' + str(all_stats['gallery_files_size']))
+sys.stdout.write(' "Total size of gallery" GAUGE Bytes//Kilobytes ' + str(all_stats['gallery_items_size']))
+
+# Total size
+sys.stdout.write(' "Total disk space consumed" GAUGE Bytes//Megabytes ' + str(all_stats['total_size']))
+
+# Trailing newline!
+sys.stdout.write("\n")
 
