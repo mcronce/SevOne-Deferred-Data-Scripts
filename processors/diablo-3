@@ -1,0 +1,267 @@
+#!/usr/bin/python2.7
+# -*- coding: utf-8 -*-
+import calendar
+import lxml.html
+import mechanize
+import re
+import sys
+import time
+from datetime import datetime
+from optparse import OptionParser
+
+# Constants {{{
+URL_BASE = 'http://us.battle.net/d3/en/profile/'
+regex_number = re.compile('-?[0-9,.]+')
+labels_attribute = {
+	'Strength' : 'strength',
+	'Dexterity' : 'dexterity',
+	'Intelligence' : 'intelligence',
+	'Vitality' : 'vitality',
+	'DPS' : 'dps',
+	'Toughness' : 'toughness',
+	'Healing' : 'healing'
+}
+labels_follower = {
+	'Enchantress' : 'enchantress',
+	'Scoundrel' : 'scoundrel',
+	'Templar' : 'templar'
+}
+labels_follower_stats = {
+	'Gold Find' : 'goldfind',
+	'Magic Find' : 'magicfind',
+	'Experience' : 'experience'
+}
+labels_kills = {
+	'Lifetime Kills' : 'lifetime_kills',
+	'Elite Kills' : 'elite_kills'
+}
+labels_class = {
+	'Barbarian' : 'barbarian',
+	'Crusader' : 'crusader',
+	'Demon Hunter' : 'demon-hunter',
+	'Monk' : 'monk',
+	'Witch Doctor' : 'witch-doctor',
+	'Wizard' : 'wizard'
+}
+labels_artisan = {
+	'Blacksmith' : 'blacksmith',
+	'Jeweler' : 'jeweler',
+	'Mystic' : 'mystic'
+}
+# }}}
+
+def get_numbers(string): # {{{
+	numbers = regex_number.findall(string)
+	if(len(numbers) == 0):
+		return ['NULL']
+	
+	for i in xrange(len(numbers)):
+		numbers[i] = numbers[i].replace(',', '')
+	
+	return numbers
+# }}}
+
+def find_first_child(element, tag): # {{{
+	for child in element.iterchildren():
+		if(child.tag == tag):
+			return child
+	return None
+# }}}
+
+def find_all_children(element, tag): # {{{
+	children = []
+	for child in element.iterchildren():
+		if(child.tag == tag):
+			children.append(child)
+	return children
+# }}}
+
+def process_hero(br, url): # {{{
+	response = br.open(url)
+	page = lxml.html.fromstring(response.read())
+
+	hero = {}
+	hero['name'] = page.cssselect('h2.name')[0].text.strip()
+	class_level_label = page.cssselect('h2.class')[0].find('a').find('strong')
+	hero['class'] = class_level_label.tail.strip()
+	hero['level'] = class_level_label.text.strip()
+
+	attribute_containers = page.cssselect('ul.attributes-core')
+	for ul in attribute_containers:
+		for li in ul.iterchildren():
+			for key in labels_attribute.itervalues():
+				if(li.get('data-tooltip') == '#tooltip-' + key + '-hero'):
+					hero[key] = li.cssselect('span.value')[0].text.strip()
+	
+	value = page.cssselect('div#tooltip-life-hero > div.profile-tooltip span.value')
+	hero['life'] = value[0].text.strip()
+
+	hero['resources'] = []
+	for span in page.cssselect('div#tooltip-maxPrimaryResource-hero > div.profile-tooltip span.value'):
+		(current, _, maximum) = span.text.partition('/')
+		hero['resources'].append({'cur' : current, 'max' : maximum})
+	
+	container = page.cssselect('div.profile-lower > div.profile-followers > div.section-body > div.followers')[0]
+	for follower in labels_follower.itervalues():
+		ul = container.cssselect('div.follower-' + follower + ' > ul.adventure-stats')[0]
+		for li in ul.iterchildren():
+			if(li.tag != 'li'):
+				continue
+			(value,) = get_numbers(li.cssselect('span.value')[0].text.strip())
+			label = li.cssselect('span.label')[0].text.strip()
+			hero['follower_' + follower + '_' + labels_follower_stats[label]] = value
+
+	return hero
+# }}}
+
+# Parse command-line arguments {{{
+cmdline = OptionParser(usage = 'usage: %prog profile-name')
+
+(options, args) = cmdline.parse_args()
+if(len(args) != 1):
+	cmdline.print_help()
+	sys.exit(1)
+
+(profile_name,) = args
+# }}}
+
+# Browser setup {{{
+# Initialize the browser
+br = mechanize.Browser()
+
+# Enable some handlers
+br.set_handle_equiv(True)
+br.set_handle_redirect(True)
+br.set_handle_referer(True)
+br.set_handle_robots(False)
+
+# Don't hang on >0 refresh times
+br.set_handle_refresh(mechanize._http.HTTPRefreshProcessor(), max_time = 1)
+
+# Lie, cheat, and steal
+br.addheaders = [('User-agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31 AlexaToolbar/alxg-3.1')]
+# }}}
+
+timestamp = str(int(calendar.timegm(datetime.utcnow().timetuple())))
+profile_url = URL_BASE + profile_name + '/'
+
+# Retrieve the main page, parse into an XML document, and loop through the heroes to retrieve and process their fragments {{{
+response = br.open(profile_url)
+page = lxml.html.fromstring(response.read())
+(hero_ul,) = page.cssselect('div#profile-body > div > div.profile-selector > ul.hero-tabs')
+hero_headers = hero_ul.cssselect('li > a.hero-tab')
+
+heroes = {}
+account_data = {}
+br.addheaders.append(('Referer', profile_url))
+for header in hero_headers:
+	hero_id = header.get('href')
+	try:
+		heroes[hero_id] = process_hero(br, profile_url + 'hero/' + hero_id + '.frag')
+	except Exception, e:
+		sys.stderr.write(str(e))
+		continue
+# }}}
+
+# Get the "career" page and get some stats from that {{{
+response = br.open(profile_url + 'career')
+page = lxml.html.fromstring(response.read())
+
+# Find the big container and main panels
+account_data['name'] = page.cssselect('div.body > div.body-trail > ol.ui-breadcrumb > li.last > a > span.breadcrumb-text')[0].text.strip()
+container = page.cssselect('div#profile-body')[0]
+left_panel = container.cssselect('div.career-left')[0]
+right_panel = container.cssselect('div.career-right')[0]
+bottom_panel = container.cssselect('div.career-full')[0]
+
+# OK, left panel {{{
+top_heroes = left_panel.cssselect('div.heroes > div.top-heroes > a.hero-portrait-wrapper')
+for top_hero in top_heroes:
+	hero_id = top_hero.get('href').split('/')[-1]
+	heroes[hero_id]['elite_kills'] = top_hero.cssselect('span.skill-measure')[0].text.split(' ')[0].replace(',', '')
+
+progression = left_panel.cssselect('div.progression > div.section-body > div.bosses')[0]
+account_data['acts_beaten'] = 0
+for i in xrange(0, 4):
+	account_data['acts_beaten'] = account_data['acts_beaten'] + len(progression.cssselect('div.boss' + str(i) + 'killed'))
+# }}}
+
+# Right panel {{{
+career_kills = right_panel.cssselect('div.career-kills > div.kill-section')
+for div in career_kills:
+	label = div.cssselect('span.label')[0].text.strip()
+	value = div.cssselect('span.num-kills')[0].text.strip()
+	account_data[labels_kills[label]] = value
+
+classes = right_panel.cssselect('div.class-breakdown > div.bars > div.column > div:not(.column-name):not(.bar)')
+for div in classes:
+	cls = div.get('id').replace('tooltip-bar-', '')
+	pct_time = 'percent_time_' + cls
+	hi_lvl = 'highest_level_' + cls
+	account_data[pct_time] = '0'
+	account_data[hi_lvl] = 'NULL'
+	for text in [text.strip() for text in div.itertext()]:
+		if(text.find('%') != -1):
+			account_data[pct_time] = text.replace('%', '')
+		elif(text.find('Highest Level:') != -1):
+			account_data[hi_lvl] = text.replace('Highest Level:', '').strip()
+# }}}
+
+# Bottom panel {{{
+artisans = bottom_panel.cssselect('div.artisans > div.section-body > div.artisan')
+for div in artisans:
+	try:
+		label = div.cssselect('span.title')[0].text.strip()
+		label = labels_artisan[label]
+	except:
+		label = div.get('class').split(' ')[-1].split('-')[0]
+		account_data[label + '_normal'] = 'NULL'
+		account_data[label + '_hardcore'] = 'NULL'
+		continue
+
+	try:
+		account_data[label + '_normal'] = str(int(div.cssselect('span.normal > span.value')[0].text.strip()))
+	except:
+		account_data[label + '_normal'] = '0'
+
+	try:
+		account_data[label + '_hardcore'] = str(int(div.cssselect('span.normal > span.value')[0].text.strip()))
+	except:
+		account_data[label + '_hardcore'] = '0'
+# }}}
+# }}}
+
+# Output! {{{
+sys.stdout.write(timestamp + ' "Account: ' + account_data['name'] + '" "Diablo III account" "Career stats"')
+sys.stdout.write(' "Acts complete" GAUGE Number ' + str(account_data['acts_beaten']))
+sys.stdout.write(' "Kills" GAUGE Kills ' + account_data['lifetime_kills'])
+sys.stdout.write(' "Kills /sec" COUNTER64 Kills ' + account_data['lifetime_kills'])
+sys.stdout.write(' "Elite kills" GAUGE Kills ' + account_data['elite_kills'])
+sys.stdout.write(' "Elite kills /sec" COUNTER64 Kills ' + account_data['elite_kills'])
+for (label, key) in labels_class.iteritems():
+	sys.stdout.write(' "Time spent playing ' + label + '" GAUGE Percent ' + account_data['percent_time_' + key])
+	sys.stdout.write(' "Highest level ' + label + '" GAUGE Level ' + account_data['highest_level_' + key])
+for (label, key) in labels_artisan.iteritems():
+	sys.stdout.write(' "' + label + ' level on Normal" GAUGE Level ' + account_data[key + '_normal'])
+	sys.stdout.write(' "' + label + ' level on Hardcore" GAUGE Level ' + account_data[key + '_hardcore'])
+sys.stdout.write("\n")
+
+for (hero_id, hero) in heroes.iteritems():
+	sys.stdout.write(timestamp + ' "Hero: ' + hero['name'] + ' (#' + hero_id + ')" "Diablo III hero" "' + hero['class'] + '"')
+	sys.stdout.write(' "Level" GAUGE Level ' + hero['level'])
+	for (label, key) in labels_attribute.iteritems():
+		sys.stdout.write(' "' + label + '" GAUGE Number ' + hero[key])
+	sys.stdout.write(' "Life" GAUGE Number ' + hero['life'])
+	for i in xrange(0, len(hero['resources'])):
+		sys.stdout.write(' "Resource ' + str(i) + ' current" GAUGE Number ' + hero['resources'][i]['cur'])
+		sys.stdout.write(' "Resource ' + str(i) + ' maximum" GAUGE Number ' + hero['resources'][i]['max'])
+	for (label, key) in labels_follower.iteritems():
+		for (stat_label, stat_key) in labels_follower_stats.iteritems():
+			sys.stdout.write(' "' + label + ' ' + stat_label + '" GAUGE Number ' + hero['follower_' + key + '_' + stat_key])
+	sys.stdout.write(' "Elite kills" GAUGE Kills ' + hero['elite_kills'])
+	sys.stdout.write(' "Elite kills /sec" COUNTER64 Kills ' + hero['elite_kills'])
+	sys.stdout.write("\n")
+	
+# }}}
+
+

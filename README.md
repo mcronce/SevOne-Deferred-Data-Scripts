@@ -598,3 +598,26 @@ This processor looks at individual users' directories within an Owncloud data
 directory; it provides statistics about number and size of files/directories
 active, in trash, in version control, in cache, and in the gallery.
 
+
+
+diablo-3
+========
+* Language:  Python
+* Type:      Screen scraper
+* Reference: http://us.battle.net/d3/en/
+* Usage:
+
+
+    diablo-3 Profile-ID
+	diablo-3 Derp-1915
+
+This processor scrapes statistics about a Diablo 3 character and account from
+Blizzard's character viewer web interface.
+
+To find the Profile-ID for your account, look at the URL for your web profile;
+as an example URL, we have the following:
+
+    http://us.battle.net/d3/en/profile/Derp-1915/
+
+"Derp-1915" would be the Profile-ID, in this case.
+
