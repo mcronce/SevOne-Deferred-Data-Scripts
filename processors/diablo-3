@@ -33,7 +33,8 @@ labels_follower_stats = {
 }
 labels_kills = {
 	'Lifetime Kills' : 'lifetime_kills',
-	'Elite Kills' : 'elite_kills'
+	'Elite Kills' : 'elite_kills',
+	'Paragon Level' : 'paragon_level'
 }
 labels_class = {
 	'Barbarian' : 'barbarian',
@@ -83,8 +84,13 @@ def process_hero(br, url): # {{{
 	hero = {}
 	hero['name'] = page.cssselect('h2.name')[0].text.strip()
 	class_level_label = page.cssselect('h2.class')[0].find('a').find('strong')
-	hero['class'] = class_level_label.tail.strip()
+	hero['class'] = class_level_label.tail.strip().strip('-').strip()
 	hero['level'] = class_level_label.text.strip()
+	try:
+		paragon = class_level_label.cssselect('span.paragon-level')[0]
+		hero['paragon_level'] = paragon.strip().strip('()')
+	except:
+		hero['paragon_level'] = '0'
 
 	attribute_containers = page.cssselect('ul.attributes-core')
 	for ul in attribute_containers:
@@ -180,6 +186,11 @@ for top_hero in top_heroes:
 	hero_id = top_hero.get('href').split('/')[-1]
 	heroes[hero_id]['elite_kills'] = top_hero.cssselect('span.skill-measure')[0].text.split(' ')[0].replace(',', '')
 
+other_heroes = left_panel.cssselect('div.heroes > div.other-heroes > ul > li > a')
+for other_hero in other_heroes:
+	hero_id = other_hero.get('href').split('/')[-1]
+	heroes[hero_id]['elite_kills'] = other_hero.cssselect('span.col-measure')[0].text.split(' ')[0].replace(',', '')
+
 progression = left_panel.cssselect('div.progression > div.section-body > div.bosses')[0]
 account_data['acts_beaten'] = 0
 for i in xrange(0, 4):
@@ -192,6 +203,10 @@ for div in career_kills:
 	label = div.cssselect('span.label')[0].text.strip()
 	value = div.cssselect('span.num-kills')[0].text.strip()
 	account_data[labels_kills[label]] = value
+
+for key in labels_kills.itervalues():
+	if(not account_data.has_key(key)):
+		account_data[key] = '0'
 
 classes = right_panel.cssselect('div.class-breakdown > div.bars > div.column > div:not(.column-name):not(.bar)')
 for div in classes:
