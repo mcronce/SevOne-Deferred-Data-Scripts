@@ -239,7 +239,8 @@ function report_stats($deviceId, $time, $objectType, $objectName, $objectDescrip
 	if(array_key_exists($objectType, $ot_by_name)) {
 		$ot = $ot_by_name[$objectType];
 	} else {
-		echo '+++ ot_by_name cache miss ("', $objectType, '")', PHP_EOL;
+		// TODO:  Verbose flag to print this
+		//echo '+++ ot_by_name cache miss ("', $objectType, '")', PHP_EOL;
 
 		try {
 			$ot = $client->plugin_deferred_getObjectTypeByOsIdAndName(0, $objectType);
@@ -272,7 +273,8 @@ function report_stats($deviceId, $time, $objectType, $objectName, $objectDescrip
 	if(array_key_exists($ot->id, $itypes_by_otId)) {
 		$indicatorTypes = &$itypes_by_otId[$ot->id];
 	} else {
-		echo '+++ itypes_by_otId cache miss ("', $ot->id, '")', PHP_EOL;
+		// TODO:  Verbose flag to print this
+		//echo '+++ itypes_by_otId cache miss ("', $ot->id, '")', PHP_EOL;
 		$indicatorTypes = array();
 		$itypes = $client->plugin_deferred_getIndicatorTypesByObjectTypeId($ot->id);
 		foreach($itypes as $indicator) {
@@ -304,7 +306,8 @@ function report_stats($deviceId, $time, $objectType, $objectName, $objectDescrip
 	if(array_key_exists($objectKey, $obj_by_devIdAndName)) {
 		$obj = $obj_by_devIdAndName[$objectKey];
 	} else {
-		echo '+++ $obj_by_devIdAndName cache miss ("', $objectKey, '")', PHP_EOL;
+		// TODO:  Verbose flag to print this
+		//echo '+++ $obj_by_devIdAndName cache miss ("', $objectKey, '")', PHP_EOL;
 		$obj = $client->plugin_deferred_getObject($deviceId,$objectName);
 		if(!(array)$obj) {
 			$objId = $client->plugin_deferred_createObject($deviceId,$ot->id,$objectName);
@@ -325,7 +328,8 @@ function report_stats($deviceId, $time, $objectType, $objectName, $objectDescrip
 	if(array_key_exists($indicatorKey, $inds_by_devIdAndObjId)) {
 		$inds = $inds_by_devIdAndObjId[$indicatorKey];
 	} else {
-		echo '+++ $inds_by_devIdAndObjId cache miss ("', $indicatorKey, '")', PHP_EOL;
+		// TODO:  Verbose flag to print this
+		//echo '+++ $inds_by_devIdAndObjId cache miss ("', $indicatorKey, '")', PHP_EOL;
 		$inds = array();
 		$itypes = $client->plugin_deferred_getIndicatorsByObject($deviceId, $obj->name);
 		foreach($itypes as $indicator) {
