@@ -227,40 +227,58 @@ function parse_data_line($line) { // {{{
 
 	@return None
 */
-function report_stats($deviceId, $time, $objectType, $objectName, $objectDescription, $indicators) {
+
+function report_stats($deviceId, $time, $objectType, $objectName, $objectDescription, $indicators) { /* {{{ */
 	global $client;
+	static $ot_by_name = array();
+	static $itypes_by_otId = array();
+	static $obj_by_devIdAndName = array();
+	static $inds_by_devIdAndObjId = array();
 
-	//! Find the object type  (create if necessary)
+	//! Find the object type (create if necessary)
+	if(array_key_exists($objectType, $ot_by_name)) {
+		$ot = $ot_by_name[$objectType];
+	} else {
+		echo '+++ ot_by_name cache miss ("', $objectType, '")', PHP_EOL;
 
-	try {
-		$ot = $client->plugin_deferred_getObjectTypeByOsIdAndName(0, $objectType);
-	} catch(SoapFault $e) {
-		$ots = $client->plugin_deferred_getObjectTypes();
-		$ot = null;
-		foreach($ots as $_ot) {
-			if($_ot->name == $objectType) {
-				$ot = $_ot;
-				break;
+		try {
+			$ot = $client->plugin_deferred_getObjectTypeByOsIdAndName(0, $objectType);
+		} catch(SoapFault $e) {
+			$ots = $client->plugin_deferred_getObjectTypes();
+			$ot = null;
+			foreach($ots as $_ot) {
+				if($_ot->name == $objectType) {
+					$ot = $_ot;
+					break;
+				}
 			}
 		}
-	}
 
-	if(!$ot) {
-		$otid = $client->plugin_deferred_createObjectType(0, $objectType);
-		sleep(5);
-		$ot = $client->plugin_deferred_getObjectTypeById($otid);
-	}
-	if(!$ot) {
-		throw new Exception("Error creating new object type\n");
-	} elseif(isset($otid)) {
-		echo '--- Created new Object Type, called "', $objectType, '", with ID ', $otid, PHP_EOL;
+		if(!$ot) {
+			$otid = $client->plugin_deferred_createObjectType(0, $objectType);
+			sleep(5);
+			$ot = $client->plugin_deferred_getObjectTypeById($otid);
+		}
+		if(!$ot) {
+			throw new Exception("Error creating new object type\n");
+		} elseif(isset($otid)) {
+			echo '--- Created new Object Type, called "', $objectType, '", with ID ', $otid, PHP_EOL;
+		}
+		$ot_by_name[$objectType] = $ot;
 	}
 
 	//! Find the Indicator Types (create if necessary)
-	$indicatorTypes = array();
-	$itypes = $client->plugin_deferred_getIndicatorTypesByObjectTypeId($ot->id);
-	foreach($itypes as $indicator) {
-		$indicatorTypes[$indicator->name] = $indicator;
+	unset($indicatorTypes);
+	if(array_key_exists($ot->id, $itypes_by_otId)) {
+		$indicatorTypes = &$itypes_by_otId[$ot->id];
+	} else {
+		echo '+++ itypes_by_otId cache miss ("', $ot->id, '")', PHP_EOL;
+		$indicatorTypes = array();
+		$itypes = $client->plugin_deferred_getIndicatorTypesByObjectTypeId($ot->id);
+		foreach($itypes as $indicator) {
+			$indicatorTypes[$indicator->name] = $indicator;
+		}
+		$itypes_by_otId[$ot->id] = &$indicatorTypes;
 	}
 	foreach($indicators as $indicator) {
 		if(!array_key_exists($indicator["name"], $indicatorTypes)){
@@ -282,24 +300,38 @@ function report_stats($deviceId, $time, $objectType, $objectName, $objectDescrip
 	}
 
 	//! Get the object
-	$obj = $client->plugin_deferred_getObject($deviceId,$objectName);
-	if(!(array)$obj) {
-		$objId = $client->plugin_deferred_createObject($deviceId,$ot->id,$objectName);
-		echo '--- Created new Object, called "', $objectName, '", with ID ', $objId, ' and Object Type ', $ot->id, PHP_EOL;
-		$client->plugin_deferred_setObjectOverrideDescription($deviceId, $objId, 1, $objectDescription);
-		$client->plugin_deferred_setObjectIsEnabled($deviceId, $objId, 1);
-		$client->plugin_deferred_setObjectIsHidden($deviceId, $objId, 0);
-		//! If this object doesn't exist we need discovery to make it
-		$client->core_rediscoverDevice($deviceId);
-		return;
+	$objectKey = $deviceId . ':' . $objectName;
+	if(array_key_exists($objectKey, $obj_by_devIdAndName)) {
+		$obj = $obj_by_devIdAndName[$objectKey];
+	} else {
+		echo '+++ $obj_by_devIdAndName cache miss ("', $objectKey, '")', PHP_EOL;
+		$obj = $client->plugin_deferred_getObject($deviceId,$objectName);
+		if(!(array)$obj) {
+			$objId = $client->plugin_deferred_createObject($deviceId,$ot->id,$objectName);
+			echo '--- Created new Object, called "', $objectName, '", with ID ', $objId, ' and Object Type ', $ot->id, PHP_EOL;
+			$client->plugin_deferred_setObjectOverrideDescription($deviceId, $objId, 1, $objectDescription);
+			$client->plugin_deferred_setObjectIsEnabled($deviceId, $objId, 1);
+			$client->plugin_deferred_setObjectIsHidden($deviceId, $objId, 0);
+			//! If this object doesn't exist we need discovery to make it
+			$client->core_rediscoverDevice($deviceId);
+			return;
+		}
+		$client->plugin_deferred_setObjectOverrideDescription($deviceId, $obj->id, 1, $objectDescription);
+		$obj_by_devIdAndName[$objectKey] = $obj;
 	}
-	$client->plugin_deferred_setObjectOverrideDescription($deviceId, $obj->id, 1, $objectDescription);
 
 	//! Find the indicators (Create if necessary)
-	$inds = array();
-	$itypes = $client->plugin_deferred_getIndicatorsByObject($deviceId, $obj->name);
-	foreach($itypes as $indicator) {
-		$inds[$indicator->indicatorType] = $indicator;
+	$indicatorKey = $deviceId . ':' . $obj->id;
+	if(array_key_exists($indicatorKey, $inds_by_devIdAndObjId)) {
+		$inds = $inds_by_devIdAndObjId[$indicatorKey];
+	} else {
+		echo '+++ $inds_by_devIdAndObjId cache miss ("', $indicatorKey, '")', PHP_EOL;
+		$inds = array();
+		$itypes = $client->plugin_deferred_getIndicatorsByObject($deviceId, $obj->name);
+		foreach($itypes as $indicator) {
+			$inds[$indicator->indicatorType] = $indicator;
+		}
+		$inds_by_devIdAndObjId[$indicatorKey] = $inds;
 	}
 
 	//! Submit the indicators
@@ -323,7 +355,7 @@ function report_stats($deviceId, $time, $objectType, $objectName, $objectDescrip
 		echo '--- Inserting data row for Object "', $objectName, '" (ID# ', $obj->id, ') at ', $time, ' (', @date('Y-m-d H:i:s', $time), ')', PHP_EOL;
 		$client->plugin_deferred_insertDataRows($deviceId, array_keys($data), array($time), array($time => array_values($data)));
 	}
-}
+} // }}}
 
 //read in the lines from the script
 $in = fopen('php://stdin', 'r');
