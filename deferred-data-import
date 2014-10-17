@@ -165,10 +165,7 @@ function parse_data_line($line) { // {{{
 		'indicators' => array()
 	);
 
-	if($output['time'] === false) {
-		echo '!!! Data row for object "', $output['object_name'], '" had invalid time "', $original_time, '"', PHP_EOL;
-		return false;
-	} elseif(count($items) % 4 != 0) {
+	if(count($items) % 4 != 0) {
 		echo '!!! Data row for object "', $output['object_name'], '" at time "', $original_time, '" had an invalid number of arguments (', count($items), ')', PHP_EOL;
 		return false;
 	}
@@ -356,8 +353,13 @@ function report_stats($deviceId, $time, $objectType, $objectName, $objectDescrip
 			}
 		}
 
-		echo '--- Inserting data row for Object "', $objectName, '" (ID# ', $obj->id, ') at ', $time, ' (', @date('Y-m-d H:i:s', $time), ')', PHP_EOL;
-		$client->plugin_deferred_insertDataRows($deviceId, array_keys($data), array($time), array($time => array_values($data)));
+		if(is_numeric($time)) {
+			echo '--- Inserting data row for Object "', $objectName, '" (ID# ', $obj->id, ') at ', $time, ' (', @date('Y-m-d H:i:s', $time), ')', PHP_EOL;
+			$client->plugin_deferred_insertDataRows($deviceId, array_keys($data), array($time), array($time => array_values($data)));
+		} else {
+			echo '--- Inserting data row for Object "', $objectName, '" (ID# ', $obj->id, ') at ', date('U'), ' (', date('Y-m-d H:i:s'), ') [NOW]', PHP_EOL;
+			$client->plugin_deferred_insertDataRow($deviceId, array_keys($data), array_values($data));
+		}
 	}
 } // }}}
 
