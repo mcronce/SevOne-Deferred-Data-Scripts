@@ -1,12 +1,12 @@
 #!/usr/bin/python2
+import datetime
 import calendar
 import lxml.etree
 import mechanize
+import optparse
 import re
 import sys
 import time
-from datetime import datetime
-from optparse import OptionParser
 
 # Constants {{{
 regex_number = re.compile('-?[0-9,.]+')
@@ -35,7 +35,7 @@ def secs_to_mins(numbers): # {{{
 # }}}
 
 def get_date(): # {{{
-	return str(int(time.mktime(datetime.now().timetuple())))
+	return str(int(time.mktime(datetime.datetime.now().timetuple())))
 # }}}
 
 def avg(numerator, denominator): # {{{
@@ -554,7 +554,7 @@ def handle_music_library(key, title): # {{{
 # }}}
 
 # Parse command-line arguments {{{
-cmdline = OptionParser(usage = 'usage: %prog [options] hostname-or-ip')
+cmdline = optparse.OptionParser(usage = 'usage: %prog [options] hostname-or-ip')
 cmdline.add_option('-p', '--port', action = 'store', dest = 'port', default = '32400', help = 'The TCP port that Plex\'s web service is listening on')
 
 (options, args) = cmdline.parse_args()
