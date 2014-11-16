@@ -124,7 +124,9 @@ mint
 
     mint 'Mint registered E-mail address' 'Mint password'
 
-Known issues:
+Known issues/caveats:
+* For this to work, you MUST run python3 setup.py build and
+      python3 setup.py install as root in processors/libraries/mintapi
 * Does not pull down details on individual investments, only whole accounts
 * Auto-refreshes accounts at the end of the script, rather than the beginning
 

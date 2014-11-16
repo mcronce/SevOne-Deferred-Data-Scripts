@@ -5,7 +5,7 @@ import optparse
 import sys
 import time
 
-from libraries.mintapi.mintapi.api import Mint
+import mintapi
 
 def get_timestamp(): # {{{
 	return str(int(time.mktime(datetime.datetime.now().timetuple())))
@@ -22,7 +22,7 @@ if(len(args) != 2):
 (user,password,) = args
 # }}}
 
-mint = Mint.create(user, password)
+mint = mintapi.api.Mint.create(user, password)
 
 # Accounts, then totals {{{
 timestamp = get_timestamp()
