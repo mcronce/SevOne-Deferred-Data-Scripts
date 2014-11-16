@@ -23,11 +23,11 @@ imports them to a SevOne appliance using the Deferred Data SOAP API mechanism.
 Required information is supplied to deferred-data-import via command-line, as
 follows:
 
-	deferred-data-import 'SevOne name or IP' 'username' 'password' 'Device Name'
+    deferred-data-import 'SevOne name or IP' 'username' 'password' 'Device Name'
 
 Data input should follow this format:
 
-	"timestamp" "object name" "object type" "object description" ["indicator name 1" "indicator format 1" "indicator units 1" "indicator value 1" ["indicator name 2" "indicator format 2" "indicator units 2" "indicator value 2" [... etc]]]
+    "timestamp" "object name" "object type" "object description" ["indicator name 1" "indicator format 1" "indicator units 1" "indicator value 1" ["indicator name 2" "indicator format 2" "indicator units 2" "indicator value 2" [... etc]]]
 
 Note that the units can be just a single unit for both measurement and display,
 or it can be of the format "measurement units//display units"
@@ -42,7 +42,7 @@ All the processors are executable; provided you have the proper language
 interpreters installed, simply running them with the following syntax should
 get your data imported fine:
 
-	./processors/[processor and args] | ./defererd-data-import [args]
+    ./processors/[processor and args] | ./defererd-data-import [args]
 
 
 
@@ -65,7 +65,7 @@ bamboo-rest
 * Usage:
 
 
-	bamboo-rest -u username -p password [options]
+   bamboo-rest -u username -p password [options]
 
 Provided you have Python and the dependencies installed, this one is easy. I'll
 list the depdencies below.
@@ -87,12 +87,13 @@ process-mileage
 * Usage:
 
 
-	process-mileage /path/to/csv     # Accepts a filename as a parameter
-	process-mileage < /path/to/csv   # Also accepts data over STDIN
+    process-mileage /path/to/csv     # Accepts a filename as a parameter
+    process-mileage < /path/to/csv   # Also accepts data over STDIN
 
 This one processes gas mileage data, imported to a file manually from fuel
 receipts.  It expects CSV files in the following format:
-	Time, name of station, octane rating ((RON + MON) / 2), price per gallon, volume in gallons, total price, distance travelled in mile
+
+    Time, name of station, octane rating ((RON + MON) / 2), price per gallon, volume in gallons, total price, distance travelled in mile
 
 Special considerations:
 * Time will be converted to a timestamp using strftime().  It's magic.
@@ -121,7 +122,7 @@ mint
 * Usage:
 
 
-	mint 'Mint registered E-mail address' 'Mint password'
+    mint 'Mint registered E-mail address' 'Mint password'
 
 Known issues:
 * Does not pull down details on individual investments, only whole accounts
@@ -255,7 +256,7 @@ jira-board
 * Usage:
 
 
-	jira-board 'board URL' 'Jira username' 'Jira password'
+    jira-board 'board URL' 'Jira username' 'Jira password'
 
 This processor logs into a Jira server, navigates to an Agile board, and
 exports some statistics about the issues on that Agile board.
@@ -270,7 +271,7 @@ jira-filter
 * Usage:
 
 
-	jira-filter -u username -p password [options] "filter-ID-or-JQL"
+    jira-filter -u username -p password [options] "filter-ID-or-JQL"
 
 Provided you have Python and the dependencies installed, this one is easy. I'll
 list the depdencies below.
@@ -392,7 +393,7 @@ linux-nvidia
 
 
     linux-nvidia X_Display_ID
-	Ex: linux-nvidia :0.0
+    # Ex: linux-nvidia :0.0
 
 This processor uses the `nvidia-settings` CLI utility to scrape data about an
 NVidia graphics card; metadata and utilization statistics alike.  An xAgent
@@ -469,7 +470,7 @@ wemineltc
 * Usage:
 
 
-	wemineltc Username Password
+    wemineltc Username Password
 
 This processor logs into a We Mine LTC account and scrapes data about the LTC
 network as a whole, the We Mine LTC pool, the user's account, and the user's
@@ -485,7 +486,7 @@ wemineftc
 * Usage:
 
 
-	wemineftc Username Password
+    wemineftc Username Password
 
 This processor logs into a We Mine FTC account and scrapes data about the ftc
 network as a whole, the We Mine FTC pool, the user's account, and the user's
@@ -569,7 +570,7 @@ yahoo-weather
 
 
     yahoo-weather WOEID
-	yahoo-weather 12797352
+    yahoo-weather 12797352
 
 This processor uses the Yahoo! Weather REST API to gather information about
 the weather in a given location.
@@ -592,7 +593,7 @@ owncloud
 
 
     owncloud /path/to/owncloud/install
-	owncloud /usr/share/webapps/owncloud
+    owncloud /usr/share/webapps/owncloud
 
 This processor looks at individual users' directories within an Owncloud data
 directory; it provides statistics about number and size of files/directories
@@ -609,7 +610,7 @@ diablo-3
 
 
     diablo-3 Profile-ID
-	diablo-3 Derp-1915
+    diablo-3 Derp-1915
 
 This processor scrapes statistics about a Diablo 3 character and account from
 Blizzard's character viewer web interface.
