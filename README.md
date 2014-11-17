@@ -65,6 +65,7 @@ bamboo-rest
 * Usage:
 
 
+
     bamboo-rest -u username -p password [options]
 
 Provided you have Python and the dependencies installed, this one is easy. I'll
@@ -87,8 +88,8 @@ process-mileage
 * Usage:
 
 
-    process-mileage /path/to/csv     # Accepts a filename as a parameter
 
+    process-mileage /path/to/csv     # Accepts a filename as a parameter
     process-mileage < /path/to/csv   # Also accepts data over STDIN
 
 This one processes gas mileage data, imported to a file manually from fuel
