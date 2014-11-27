@@ -85,10 +85,10 @@ time_delta = int(time.mktime(datetime.datetime.fromtimestamp(timestamp).timetupl
 
 yahoo_data = yahoo_data['query']['results']['channel']
 units = {
-	'dist' : UNITS[yahoo_data['units']['distance']] + '/Miles',
-	'press' : UNITS[yahoo_data['units']['pressure']] + '/Inches of mercury',
-	'speed' : UNITS[yahoo_data['units']['speed']] + '/Miles per hours',
-	'temp' : UNITS[yahoo_data['units']['temperature']] + '/Degrees F'
+	'dist' : UNITS[yahoo_data['units']['distance']] + '//Miles',
+	'press' : UNITS[yahoo_data['units']['pressure']] + '//Inches of mercury',
+	'speed' : UNITS[yahoo_data['units']['speed']] + '//Miles per hour',
+	'temp' : UNITS[yahoo_data['units']['temperature']] + '//Degrees F'
 }
 
 location = yahoo_data['location']
