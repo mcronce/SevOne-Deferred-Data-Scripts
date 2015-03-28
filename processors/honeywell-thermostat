@@ -22,9 +22,16 @@ phantom.addCookie({
 });
 
 // This is some debug code that prints remote (in-page) log statements to the local console.
-/*casper.on('remote.message', function onRemoteMessage(msg) {
+/*
+casper.on('remote.message', function onRemoteMessage(msg) {
 	this.echo('+++ ' + msg);
-});*/
+});
+
+// This is some debug code that prints out the URL to every single resource that a page loads.
+casper.on('resource.received', function onResourceReceived(resource) {
+	this.echo('--- ' + resource.url);
+});
+*/
 
 // looks like we need to do this part to force the onLoad javascript to run?...
 function _javascriptOnLoad() {
