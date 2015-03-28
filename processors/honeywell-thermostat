@@ -14,7 +14,12 @@ var username = system.args[4];
 var password = system.args[5];
 
 var casper = require('casper').create();
-casper.userAgent('Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31');
+casper.userAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/40.0.2214.111 Safari/537.36');
+phantom.addCookie({
+	'name' : 'LocalisationCultureCookie',
+	'value' : 'en-US',
+	'domain' : 'mytotalconnectcomfort.com'
+});
 
 // This is some debug code that prints remote (in-page) log statements to the local console.
 /*casper.on('remote.message', function onRemoteMessage(msg) {
