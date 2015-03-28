@@ -46,8 +46,7 @@ function javascriptLoadedCheck() {
 
 var timestamp = Math.round(new Date().getTime() / 1000);
 
-casper.start('https://mytotalconnectcomfort.com/portal', javascriptOnLoad);
-
+casper.start('https://mytotalconnectcomfort.com/portal');
 casper.then(function login() {
 	this.fill('div#login > div > div > form', {
 		'UserName' : username,
