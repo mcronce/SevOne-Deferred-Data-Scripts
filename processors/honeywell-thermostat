@@ -6,7 +6,7 @@ var fs = require('fs');
 
 // casperjs adds three args to the beginning
 if(system.args.length != 6) {
-	this.echo('usage: honeywell-thermonstat username password');
+	console.log('usage: honeywell-thermonstat username password');
 	phantom.exit(1);
 }
 
