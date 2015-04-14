@@ -83,7 +83,7 @@ def process_hero(br, url): # {{{
 
 	hero = {}
 	hero['name'] = page.cssselect('h2.name')[0].text.strip()
-	class_level_label = page.cssselect('h2.class')[0].find('a').find('strong')
+	class_level_label = page.cssselect('h2.class')[0].find('a').find('span').find('strong')
 	hero['class'] = class_level_label.tail.strip().strip('-').strip()
 	hero['level'] = class_level_label.text.strip()
 	try:
