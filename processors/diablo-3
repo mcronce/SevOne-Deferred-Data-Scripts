@@ -1,6 +1,7 @@
 #!/usr/bin/python2.7
 # -*- coding: utf-8 -*-
 import calendar
+import json
 import lxml.html
 import mechanize
 import re
@@ -122,6 +123,7 @@ def process_hero(br, url): # {{{
 
 # Parse command-line arguments {{{
 cmdline = OptionParser(usage = 'usage: %prog profile-name')
+cmdline.add_option('-j', '--json', action = 'store_true', dest = 'json', default = False, help = 'Output pretty JSON instead of SevOne-consumable text')
 
 (options, args) = cmdline.parse_args()
 if(len(args) != 1):
@@ -247,36 +249,39 @@ for div in artisans:
 # }}}
 
 # Output! {{{
-sys.stdout.write(timestamp + ' "Account: ' + account_data['name'] + '" "Diablo III account" "Career stats"')
-sys.stdout.write(' "Acts complete" GAUGE Number ' + str(account_data['acts_beaten']))
-sys.stdout.write(' "Kills" GAUGE Kills ' + account_data['lifetime_kills'])
-sys.stdout.write(' "Kills /sec" COUNTER64 Kills ' + account_data['lifetime_kills'])
-sys.stdout.write(' "Elite kills" GAUGE Kills ' + account_data['elite_kills'])
-sys.stdout.write(' "Elite kills /sec" COUNTER64 Kills ' + account_data['elite_kills'])
-for (label, key) in labels_class.iteritems():
-	sys.stdout.write(' "Time spent playing ' + label + '" GAUGE Percent ' + account_data['percent_time_' + key])
-	sys.stdout.write(' "Highest level ' + label + '" GAUGE Level ' + account_data['highest_level_' + key])
-for (label, key) in labels_artisan.iteritems():
-	sys.stdout.write(' "' + label + ' level on Normal" GAUGE Level ' + account_data[key + '_normal'])
-	sys.stdout.write(' "' + label + ' level on Hardcore" GAUGE Level ' + account_data[key + '_hardcore'])
-sys.stdout.write("\n")
-
-for (hero_id, hero) in heroes.iteritems():
-	sys.stdout.write(timestamp + ' "Hero: ' + hero['name'] + ' (#' + hero_id + ')" "Diablo III hero" "' + hero['class'] + '"')
-	sys.stdout.write(' "Level" GAUGE Level ' + hero['level'])
-	for (label, key) in labels_attribute.iteritems():
-		sys.stdout.write(' "' + label + '" GAUGE Number ' + hero[key])
-	sys.stdout.write(' "Life" GAUGE Number ' + hero['life'])
-	for i in xrange(0, len(hero['resources'])):
-		sys.stdout.write(' "Resource ' + str(i) + ' current" GAUGE Number ' + hero['resources'][i]['cur'])
-		sys.stdout.write(' "Resource ' + str(i) + ' maximum" GAUGE Number ' + hero['resources'][i]['max'])
-	for (label, key) in labels_follower.iteritems():
-		for (stat_label, stat_key) in labels_follower_stats.iteritems():
-			sys.stdout.write(' "' + label + ' ' + stat_label + '" GAUGE Number ' + hero['follower_' + key + '_' + stat_key])
-	sys.stdout.write(' "Elite kills" GAUGE Kills ' + hero['elite_kills'])
-	sys.stdout.write(' "Elite kills /sec" COUNTER64 Kills ' + hero['elite_kills'])
+if(options.json):
+	print json.dumps({'account_data' : account_data, 'heroes' : heroes}, sort_keys = True, indent = 4)
+else:
+	sys.stdout.write(timestamp + ' "Account: ' + account_data['name'] + '" "Diablo III account" "Career stats"')
+	sys.stdout.write(' "Acts complete" GAUGE Number ' + str(account_data['acts_beaten']))
+	sys.stdout.write(' "Kills" GAUGE Kills ' + account_data['lifetime_kills'])
+	sys.stdout.write(' "Kills /sec" COUNTER64 Kills ' + account_data['lifetime_kills'])
+	sys.stdout.write(' "Elite kills" GAUGE Kills ' + account_data['elite_kills'])
+	sys.stdout.write(' "Elite kills /sec" COUNTER64 Kills ' + account_data['elite_kills'])
+	for (label, key) in labels_class.iteritems():
+		sys.stdout.write(' "Time spent playing ' + label + '" GAUGE Percent ' + account_data['percent_time_' + key])
+		sys.stdout.write(' "Highest level ' + label + '" GAUGE Level ' + account_data['highest_level_' + key])
+	for (label, key) in labels_artisan.iteritems():
+		sys.stdout.write(' "' + label + ' level on Normal" GAUGE Level ' + account_data[key + '_normal'])
+		sys.stdout.write(' "' + label + ' level on Hardcore" GAUGE Level ' + account_data[key + '_hardcore'])
 	sys.stdout.write("\n")
-	
+
+	for (hero_id, hero) in heroes.iteritems():
+		sys.stdout.write(timestamp + ' "Hero: ' + hero['name'] + ' (#' + hero_id + ')" "Diablo III hero" "' + hero['class'] + '"')
+		sys.stdout.write(' "Level" GAUGE Level ' + hero['level'])
+		for (label, key) in labels_attribute.iteritems():
+			sys.stdout.write(' "' + label + '" GAUGE Number ' + hero[key])
+		sys.stdout.write(' "Life" GAUGE Number ' + hero['life'])
+		for i in xrange(0, len(hero['resources'])):
+			sys.stdout.write(' "Resource ' + str(i) + ' current" GAUGE Number ' + hero['resources'][i]['cur'])
+			sys.stdout.write(' "Resource ' + str(i) + ' maximum" GAUGE Number ' + hero['resources'][i]['max'])
+		for (label, key) in labels_follower.iteritems():
+			for (stat_label, stat_key) in labels_follower_stats.iteritems():
+				sys.stdout.write(' "' + label + ' ' + stat_label + '" GAUGE Number ' + hero['follower_' + key + '_' + stat_key])
+		sys.stdout.write(' "Elite kills" GAUGE Kills ' + hero['elite_kills'])
+		sys.stdout.write(' "Elite kills /sec" COUNTER64 Kills ' + hero['elite_kills'])
+		sys.stdout.write("\n")
+		
 # }}}
 
 
