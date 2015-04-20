@@ -242,7 +242,7 @@ for div in artisans:
 		account_data[label + '_normal'] = '0'
 
 	try:
-		account_data[label + '_hardcore'] = str(int(div.cssselect('span.normal > span.value')[0].text.strip()))
+		account_data[label + '_hardcore'] = str(int(div.cssselect('span.hardcore > span.value')[0].text.strip()))
 	except:
 		account_data[label + '_hardcore'] = '0'
 # }}}
