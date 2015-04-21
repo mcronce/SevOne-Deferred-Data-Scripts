@@ -115,52 +115,33 @@ for hero in account_data_remote['heroes']:
 # Scrub it and make the data structures with just stuff we care about {{{
 heroes = {}
 account_data = {
-	'acts_beaten' : account_data_remote['progression'].values().count(True),
-	'blacksmith_normal' : str(account_data_remote['blacksmith']['level']),
-	'blacksmith_hardcore' : str(account_data_remote['blacksmithHardcore']['level']),
-	'elite_kills' : str(account_data_remote['kills']['elites']),
-	'highest_level_barbarian' : str(get_highest_level(account_data_remote['heroes'], 'barbarian')),
-	'highest_level_crusader' : str(get_highest_level(account_data_remote['heroes'], 'crusader')),
-	'highest_level_demon-hunter' : str(get_highest_level(account_data_remote['heroes'], 'demon-hunter')),
-	'highest_level_monk' : str(get_highest_level(account_data_remote['heroes'], 'monk')),
-	'highest_level_witch-doctor' : str(get_highest_level(account_data_remote['heroes'], 'witch-doctor')),
-	'highest_level_wizard' : str(get_highest_level(account_data_remote['heroes'], 'wizard')),
-	'jeweler_normal' : str(account_data_remote['jeweler']['level']),
-	'jeweler_hardcore' : str(account_data_remote['jewelerHardcore']['level']),
-	'lifetime_kills' : str(account_data_remote['kills']['monsters']),
-	'mystic_normal' : str(account_data_remote['mystic']['level']),
-	'mystic_hardcore' : str(account_data_remote['mysticHardcore']['level']),
 	'name' : account_data_remote['battleTag'],
-	'paragon_level' : str(account_data_remote['paragonLevel']),
-	'percent_time_barbarian' : str(int(100 * account_data_remote['timePlayed']['barbarian'])),
-	'percent_time_crusader' : str(int(100 * account_data_remote['timePlayed']['crusader'])),
-	'percent_time_demon-hunter' : str(int(100 * account_data_remote['timePlayed']['demon-hunter'])),
-	'percent_time_monk' : str(int(100 * account_data_remote['timePlayed']['monk'])),
-	'percent_time_witch-doctor' : str(int(100 * account_data_remote['timePlayed']['witch-doctor'])),
-	'percent_time_wizard' : str(int(100 * account_data_remote['timePlayed']['wizard']))
+	'acts_beaten' : account_data_remote['progression'].values().count(True),
+	'elite_kills' : str(account_data_remote['kills']['elites']),
+	'lifetime_kills' : str(account_data_remote['kills']['monsters']),
+	'paragon_level' : str(account_data_remote['paragonLevel'])
 }
+for key in CLASSES.iterkeys():
+	account_data['highest_level_' + key] = str(get_highest_level(account_data_remote['heroes'], key))
+	account_data['percent_time_' + key] = str(int(100 * account_data_remote['timePlayed'][key]))
+for key in ARTISANS.iterkeys():
+	account_data[key + '_normal'] =  str(account_data_remote[key]['level'])
+	account_data[key + '_hardcore'] =  str(account_data_remote[key + 'Hardcore']['level'])
 
 for hero in heroes_remote.values():
-	heroes[str(hero['id'])] = {
-		'class' : CLASSES[hero['class']],
-		'dexterity' : str(hero['stats']['dexterity']),
-		'dps' : str(hero['stats']['damage']),
-		'elite_kills' : str(hero['kills']['elites']),
-		'follower_enchantress_experience' : '0' if not 'enchantress' in hero['followers'].keys() else str(hero['followers']['enchantress']['stats']['experienceBonus']),
-		'follower_enchantress_goldfind' : '0' if not 'enchantress' in hero['followers'].keys() else str(hero['followers']['enchantress']['stats']['goldFind']),
-		'follower_enchantress_magicfind' : '0' if not 'enchantress' in hero['followers'].keys() else str(hero['followers']['enchantress']['stats']['magicFind']),
-		'follower_scoundrel_experience' : '0' if not 'scoundrel' in hero['followers'].keys() else str(hero['followers']['scoundrel']['stats']['experienceBonus']),
-		'follower_scoundrel_goldfind' : '0' if not 'scoundrel' in hero['followers'].keys() else str(hero['followers']['scoundrel']['stats']['goldFind']),
-		'follower_scoundrel_magicfind' : '0' if not 'scoundrel' in hero['followers'].keys() else str(hero['followers']['scoundrel']['stats']['magicFind']),
-		'follower_templar_experience' : '0' if not 'templar' in hero['followers'].keys() else str(hero['followers']['templar']['stats']['experienceBonus']),
-		'follower_templar_goldfind' : '0' if not 'templar' in hero['followers'].keys() else str(hero['followers']['templar']['stats']['goldFind']),
-		'follower_templar_magicfind' : '0' if not 'templar' in hero['followers'].keys() else str(hero['followers']['templar']['stats']['magicFind']),
-		'healing' : str(hero['stats']['healing']),
-		'intelligence' : str(hero['stats']['intelligence']),
-		'level' : str(hero['level']),
-		'life' : str(hero['stats']['life']),
+	hero_entry = {
 		'name' : hero['name'],
+		'class' : CLASSES[hero['class']],
+		'level' : str(hero['level']),
 		'paragon_level' : str(hero['paragonLevel']),
+		'dexterity' : str(hero['stats']['dexterity']),
+		'intelligence' : str(hero['stats']['intelligence']),
+		'strength' : str(hero['stats']['strength']),
+		'vitality' : str(hero['stats']['vitality']),
+		'life' : str(hero['stats']['life']),
+		'dps' : str(hero['stats']['damage']),
+		'toughness' : str(hero['stats']['toughness']),
+		'healing' : str(hero['stats']['healing']),
 		'resources' : [
 			{
 				'cur' : str(hero['stats']['primaryResource']),
@@ -170,11 +151,13 @@ for hero in heroes_remote.values():
 				'cur' : 'NULL' if hero['stats']['secondaryResource'] == 0 else str(hero['stats']['secondaryResource']),
 				'max' : 'NULL' if hero['stats']['secondaryResource'] == 0 else str(hero['stats']['secondaryResource']),
 			}
-		],
-		'strength' : str(hero['stats']['strength']),
-		'toughness' : str(hero['stats']['toughness']),
-		'vitality' : str(hero['stats']['vitality'])
+		]
 	}
+	for key in FOLLOWERS.iterkeys():
+		hero_entry['follower_' + key + '_experience'] = '0' if not key in hero['followers'].keys() else str(hero['followers'][key]['stats']['experienceBonus'])
+		hero_entry['follower_' + key + '_goldfind'] = '0' if not key in hero['followers'].keys() else str(hero['followers'][key]['stats']['goldFind'])
+		hero_entry['follower_' + key + '_magicfind'] = '0' if not key in hero['followers'].keys() else str(hero['followers'][key]['stats']['magicFind'])
+	heroes[str(hero['id'])] = hero_entry
 # }}}
 
 # Output! {{{
