@@ -1,128 +1,97 @@
 #!/usr/bin/python2.7
-# -*- coding: utf-8 -*-
 import calendar
+import datetime
 import json
-import lxml.html
-import mechanize
-import re
+import optparse
 import sys
 import time
-from datetime import datetime
-from optparse import OptionParser
+import urllib2
 
 # Constants {{{
-URL_BASE = 'http://us.battle.net/d3/en/profile/'
-regex_number = re.compile('-?[0-9,.]+')
-labels_attribute = {
-	'Strength' : 'strength',
-	'Dexterity' : 'dexterity',
-	'Intelligence' : 'intelligence',
-	'Vitality' : 'vitality',
-	'DPS' : 'dps',
-	'Toughness' : 'toughness',
-	'Healing' : 'healing'
+DOMAIN = 'http://us.battle.net'
+URL_BASE = DOMAIN + '/api/d3/profile/'
+
+CLASSES = {
+	'barbarian' : 'Barbarian',
+	'crusader' : 'Crusader',
+	'demon-hunter' : 'Demon Hunter',
+	'monk' : 'Monk',
+	'witch-doctor' : 'Witch Doctor',
+	'wizard' : 'Wizard'
 }
-labels_follower = {
-	'Enchantress' : 'enchantress',
-	'Scoundrel' : 'scoundrel',
-	'Templar' : 'templar'
+
+ARTISANS = {
+	'blacksmith' : 'Blacksmith',
+	'jeweler' : 'Jeweler',
+	'mystic' : 'Mystic'
 }
-labels_follower_stats = {
-	'Gold Find' : 'goldfind',
-	'Magic Find' : 'magicfind',
-	'Experience' : 'experience'
+
+STATS = {
+	'strength' : 'Strength',
+	'dexterity' : 'Dexterity',
+	'intelligence' : 'Intelligence',
+	'vitality' : 'Vitality',
+	'dps' : 'DPS',
+	'toughness' : 'Toughness',
+	'healing' : 'Healing'
 }
-labels_kills = {
-	'Lifetime Kills' : 'lifetime_kills',
-	'Elite Kills' : 'elite_kills',
-	'Paragon Level' : 'paragon_level'
+
+FOLLOWERS = {
+	'enchantress' : 'Enchantress',
+	'scoundrel' : 'Scoundrel',
+	'templar' : 'Templar'
 }
-labels_class = {
-	'Barbarian' : 'barbarian',
-	'Crusader' : 'crusader',
-	'Demon Hunter' : 'demon-hunter',
-	'Monk' : 'monk',
-	'Witch Doctor' : 'witch-doctor',
-	'Wizard' : 'wizard'
-}
-labels_artisan = {
-	'Blacksmith' : 'blacksmith',
-	'Jeweler' : 'jeweler',
-	'Mystic' : 'mystic'
+
+FOLLOWER_STATS = {
+	'goldfind' : 'Gold Find',
+	'magicfind' : 'Magic Find',
+	'experience' : 'Experience'
 }
 # }}}
 
-def get_numbers(string): # {{{
-	numbers = regex_number.findall(string)
-	if(len(numbers) == 0):
-		return ['NULL']
-	
-	for i in xrange(len(numbers)):
-		numbers[i] = numbers[i].replace(',', '')
-	
-	return numbers
-# }}}
+# CLEVERLY NAMED function to retrieve a remote URL
+def curl(url, data = None): # {{{
+	req = urllib2.Request(url)
 
-def find_first_child(element, tag): # {{{
-	for child in element.iterchildren():
-		if(child.tag == tag):
-			return child
-	return None
-# }}}
+	if(data != None):
+		req.add_data(urllib.urlencode(data))
 
-def find_all_children(element, tag): # {{{
-	children = []
-	for child in element.iterchildren():
-		if(child.tag == tag):
-			children.append(child)
-	return children
-# }}}
-
-def process_hero(br, url): # {{{
-	response = br.open(url)
-	page = lxml.html.fromstring(response.read())
-
-	hero = {}
-	hero['name'] = page.cssselect('h2.name')[0].text.strip()
-	class_level_label = page.cssselect('h2.class')[0].find('a').find('span').find('strong')
-	hero['class'] = class_level_label.tail.strip().strip('-').strip()
-	hero['level'] = class_level_label.text.strip()
 	try:
-		paragon = class_level_label.cssselect('span.paragon-level')[0]
-		hero['paragon_level'] = paragon.strip().strip('()')
-	except:
-		hero['paragon_level'] = '0'
-
-	attribute_containers = page.cssselect('ul.attributes-core')
-	for ul in attribute_containers:
-		for li in ul.iterchildren():
-			for key in labels_attribute.itervalues():
-				if(li.get('data-tooltip') == '#tooltip-' + key + '-hero'):
-					hero[key] = li.cssselect('span.value')[0].text.strip()
+		handle = urllib2.urlopen(req)
+	except IOError, e:
+		return ''
 	
-	value = page.cssselect('div#tooltip-life-hero > div.profile-tooltip span.value')
-	hero['life'] = value[0].text.strip()
-
-	hero['resources'] = []
-	for span in page.cssselect('div#tooltip-maxPrimaryResource-hero > div.profile-tooltip span.value'):
-		(current, _, maximum) = span.text.partition('/')
-		hero['resources'].append({'cur' : current, 'max' : maximum})
-	
-	container = page.cssselect('div.profile-lower > div.profile-followers > div.section-body > div.followers')[0]
-	for follower in labels_follower.itervalues():
-		ul = container.cssselect('div.follower-' + follower + ' > ul.adventure-stats')[0]
-		for li in ul.iterchildren():
-			if(li.tag != 'li'):
-				continue
-			(value,) = get_numbers(li.cssselect('span.value')[0].text.strip())
-			label = li.cssselect('span.label')[0].text.strip()
-			hero['follower_' + follower + '_' + labels_follower_stats[label]] = value
-
-	return hero
+	data = handle.read()
+	return data 
 # }}}
 
+# Warning: This will loop forever if curl or json.loads() keeps throwing exceptions
+def curlJson(url, data = None): # {{{
+	jsonSuccess = False
+	failCount = 0
+	while(failCount < 5 and not jsonSuccess):
+		try:
+			daters = json.loads(curl(url, data))
+			jsonSuccess = True
+		except:
+			#print 'derped. herping again'
+			failCount = failCount + 1
+			jsonSuccess = False
+	if(failCount >= 5):
+		sys.exit(2)
+	return daters
+# }}}
+
+def get_highest_level(heroes, classname): # {{{
+	highest_level = 0
+	for hero in [hero for hero in heroes if hero['class'] == classname]:
+		if(hero['level'] > highest_level):
+			highest_level = hero['level']
+	return "NULL" if highest_level == 0 else highest_level
+# }}}
+		
 # Parse command-line arguments {{{
-cmdline = OptionParser(usage = 'usage: %prog profile-name')
+cmdline = optparse.OptionParser(usage = 'usage: %prog profile-name')
 cmdline.add_option('-j', '--json', action = 'store_true', dest = 'json', default = False, help = 'Output pretty JSON instead of SevOne-consumable text')
 
 (options, args) = cmdline.parse_args()
@@ -133,119 +102,79 @@ if(len(args) != 1):
 (profile_name,) = args
 # }}}
 
-# Browser setup {{{
-# Initialize the browser
-br = mechanize.Browser()
-
-# Enable some handlers
-br.set_handle_equiv(True)
-br.set_handle_redirect(True)
-br.set_handle_referer(True)
-br.set_handle_robots(False)
-
-# Don't hang on >0 refresh times
-br.set_handle_refresh(mechanize._http.HTTPRefreshProcessor(), max_time = 1)
-
-# Lie, cheat, and steal
-br.addheaders = [('User-agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31 AlexaToolbar/alxg-3.1')]
-# }}}
-
-timestamp = str(int(calendar.timegm(datetime.utcnow().timetuple())))
+timestamp = str(int(calendar.timegm(datetime.datetime.utcnow().timetuple())))
+# Go out and grab all our data from the API {{{
 profile_url = URL_BASE + profile_name + '/'
 
-# Retrieve the main page, parse into an XML document, and loop through the heroes to retrieve and process their fragments {{{
-response = br.open(profile_url)
-page = lxml.html.fromstring(response.read())
-(hero_ul,) = page.cssselect('div#profile-body > div > div.profile-selector > ul.hero-tabs')
-hero_headers = hero_ul.cssselect('li > a.hero-tab')
+heroes_remote = {}
+account_data_remote = curlJson(profile_url)
+for hero in account_data_remote['heroes']:
+	heroes_remote[hero['id']] = curlJson(profile_url + 'hero/' + str(hero['id']))
+# }}}
 
+# Scrub it and make the data structures with just stuff we care about {{{
 heroes = {}
-account_data = {}
-br.addheaders.append(('Referer', profile_url))
-for header in hero_headers:
-	hero_id = header.get('href')
-	try:
-		heroes[hero_id] = process_hero(br, profile_url + 'hero/' + hero_id + '.frag')
-	except Exception, e:
-		sys.stderr.write(str(e))
-		continue
-# }}}
+account_data = {
+	'acts_beaten' : account_data_remote['progression'].values().count(True),
+	'blacksmith_normal' : str(account_data_remote['blacksmith']['level']),
+	'blacksmith_hardcore' : str(account_data_remote['blacksmithHardcore']['level']),
+	'elite_kills' : str(account_data_remote['kills']['elites']),
+	'highest_level_barbarian' : str(get_highest_level(account_data_remote['heroes'], 'barbarian')),
+	'highest_level_crusader' : str(get_highest_level(account_data_remote['heroes'], 'crusader')),
+	'highest_level_demon-hunter' : str(get_highest_level(account_data_remote['heroes'], 'demon-hunter')),
+	'highest_level_monk' : str(get_highest_level(account_data_remote['heroes'], 'monk')),
+	'highest_level_witch-doctor' : str(get_highest_level(account_data_remote['heroes'], 'witch-doctor')),
+	'highest_level_wizard' : str(get_highest_level(account_data_remote['heroes'], 'wizard')),
+	'jeweler_normal' : str(account_data_remote['jeweler']['level']),
+	'jeweler_hardcore' : str(account_data_remote['jewelerHardcore']['level']),
+	'lifetime_kills' : str(account_data_remote['kills']['monsters']),
+	'mystic_normal' : str(account_data_remote['mystic']['level']),
+	'mystic_hardcore' : str(account_data_remote['mysticHardcore']['level']),
+	'name' : account_data_remote['battleTag'],
+	'paragon_level' : str(account_data_remote['paragonLevel']),
+	'percent_time_barbarian' : str(int(100 * account_data_remote['timePlayed']['barbarian'])),
+	'percent_time_crusader' : str(int(100 * account_data_remote['timePlayed']['crusader'])),
+	'percent_time_demon-hunter' : str(int(100 * account_data_remote['timePlayed']['demon-hunter'])),
+	'percent_time_monk' : str(int(100 * account_data_remote['timePlayed']['monk'])),
+	'percent_time_witch-doctor' : str(int(100 * account_data_remote['timePlayed']['witch-doctor'])),
+	'percent_time_wizard' : str(int(100 * account_data_remote['timePlayed']['wizard']))
+}
 
-# Get the "career" page and get some stats from that {{{
-response = br.open(profile_url + 'career')
-page = lxml.html.fromstring(response.read())
-
-# Find the big container and main panels
-account_data['name'] = page.cssselect('div.body > div.body-trail > ol.ui-breadcrumb > li.last > a > span.breadcrumb-text')[0].text.strip()
-container = page.cssselect('div#profile-body')[0]
-left_panel = container.cssselect('div.career-left')[0]
-right_panel = container.cssselect('div.career-right')[0]
-bottom_panel = container.cssselect('div.career-full')[0]
-
-# OK, left panel {{{
-top_heroes = left_panel.cssselect('div.heroes > div.top-heroes > a.hero-portrait-wrapper')
-for top_hero in top_heroes:
-	hero_id = top_hero.get('href').split('/')[-1]
-	heroes[hero_id]['elite_kills'] = top_hero.cssselect('span.skill-measure')[0].text.split(' ')[0].replace(',', '')
-
-other_heroes = left_panel.cssselect('div.heroes > div.other-heroes > ul > li > a')
-for other_hero in other_heroes:
-	hero_id = other_hero.get('href').split('/')[-1]
-	heroes[hero_id]['elite_kills'] = other_hero.cssselect('span.col-measure')[0].text.split(' ')[0].replace(',', '')
-
-progression = left_panel.cssselect('div.progression > div.section-body > div.bosses')[0]
-account_data['acts_beaten'] = 0
-for i in xrange(0, 4):
-	account_data['acts_beaten'] = account_data['acts_beaten'] + len(progression.cssselect('div.boss' + str(i) + 'killed'))
-# }}}
-
-# Right panel {{{
-career_kills = right_panel.cssselect('div.career-kills > div.kill-section')
-for div in career_kills:
-	label = div.cssselect('span.label')[0].text.strip()
-	value = div.cssselect('span.num-kills')[0].text.strip()
-	account_data[labels_kills[label]] = value
-
-for key in labels_kills.itervalues():
-	if(not account_data.has_key(key)):
-		account_data[key] = '0'
-
-classes = right_panel.cssselect('div.class-breakdown > div.bars > div.column > div:not(.column-name):not(.bar)')
-for div in classes:
-	cls = div.get('id').replace('tooltip-bar-', '')
-	pct_time = 'percent_time_' + cls
-	hi_lvl = 'highest_level_' + cls
-	account_data[pct_time] = '0'
-	account_data[hi_lvl] = 'NULL'
-	for text in [text.strip() for text in div.itertext()]:
-		if(text.find('%') != -1):
-			account_data[pct_time] = text.replace('%', '')
-		elif(text.find('Highest Level:') != -1):
-			account_data[hi_lvl] = text.replace('Highest Level:', '').strip()
-# }}}
-
-# Bottom panel {{{
-artisans = bottom_panel.cssselect('div.artisans > div.section-body > div.artisan')
-for div in artisans:
-	try:
-		label = div.cssselect('span.title')[0].text.strip()
-		label = labels_artisan[label]
-	except:
-		label = div.get('class').split(' ')[-1].split('-')[0]
-		account_data[label + '_normal'] = 'NULL'
-		account_data[label + '_hardcore'] = 'NULL'
-		continue
-
-	try:
-		account_data[label + '_normal'] = str(int(div.cssselect('span.normal > span.value')[0].text.strip()))
-	except:
-		account_data[label + '_normal'] = '0'
-
-	try:
-		account_data[label + '_hardcore'] = str(int(div.cssselect('span.hardcore > span.value')[0].text.strip()))
-	except:
-		account_data[label + '_hardcore'] = '0'
-# }}}
+for hero in heroes_remote.values():
+	heroes[str(hero['id'])] = {
+		'class' : CLASSES[hero['class']],
+		'dexterity' : str(hero['stats']['dexterity']),
+		'dps' : str(hero['stats']['damage']),
+		'elite_kills' : str(hero['kills']['elites']),
+		'follower_enchantress_experience' : '0' if not 'enchantress' in hero['followers'].keys() else str(hero['followers']['enchantress']['stats']['experienceBonus']),
+		'follower_enchantress_goldfind' : '0' if not 'enchantress' in hero['followers'].keys() else str(hero['followers']['enchantress']['stats']['goldFind']),
+		'follower_enchantress_magicfind' : '0' if not 'enchantress' in hero['followers'].keys() else str(hero['followers']['enchantress']['stats']['magicFind']),
+		'follower_scoundrel_experience' : '0' if not 'scoundrel' in hero['followers'].keys() else str(hero['followers']['scoundrel']['stats']['experienceBonus']),
+		'follower_scoundrel_goldfind' : '0' if not 'scoundrel' in hero['followers'].keys() else str(hero['followers']['scoundrel']['stats']['goldFind']),
+		'follower_scoundrel_magicfind' : '0' if not 'scoundrel' in hero['followers'].keys() else str(hero['followers']['scoundrel']['stats']['magicFind']),
+		'follower_templar_experience' : '0' if not 'templar' in hero['followers'].keys() else str(hero['followers']['templar']['stats']['experienceBonus']),
+		'follower_templar_goldfind' : '0' if not 'templar' in hero['followers'].keys() else str(hero['followers']['templar']['stats']['goldFind']),
+		'follower_templar_magicfind' : '0' if not 'templar' in hero['followers'].keys() else str(hero['followers']['templar']['stats']['magicFind']),
+		'healing' : str(hero['stats']['healing']),
+		'intelligence' : str(hero['stats']['intelligence']),
+		'level' : str(hero['level']),
+		'life' : str(hero['stats']['life']),
+		'name' : hero['name'],
+		'paragon_level' : str(hero['paragonLevel']),
+		'resources' : [
+			{
+				'cur' : str(hero['stats']['primaryResource']),
+				'max' : str(hero['stats']['primaryResource'])
+			},
+			{
+				'cur' : 'NULL' if hero['stats']['secondaryResource'] == 0 else str(hero['stats']['secondaryResource']),
+				'max' : 'NULL' if hero['stats']['secondaryResource'] == 0 else str(hero['stats']['secondaryResource']),
+			}
+		],
+		'strength' : str(hero['stats']['strength']),
+		'toughness' : str(hero['stats']['toughness']),
+		'vitality' : str(hero['stats']['vitality'])
+	}
 # }}}
 
 # Output! {{{
@@ -258,10 +187,10 @@ else:
 	sys.stdout.write(' "Kills /sec" COUNTER64 Kills ' + account_data['lifetime_kills'])
 	sys.stdout.write(' "Elite kills" GAUGE Kills ' + account_data['elite_kills'])
 	sys.stdout.write(' "Elite kills /sec" COUNTER64 Kills ' + account_data['elite_kills'])
-	for (label, key) in labels_class.iteritems():
+	for (key, label) in CLASSES.iteritems():
 		sys.stdout.write(' "Time spent playing ' + label + '" GAUGE Percent ' + account_data['percent_time_' + key])
 		sys.stdout.write(' "Highest level ' + label + '" GAUGE Level ' + account_data['highest_level_' + key])
-	for (label, key) in labels_artisan.iteritems():
+	for (key, label) in ARTISANS.iteritems():
 		sys.stdout.write(' "' + label + ' level on Normal" GAUGE Level ' + account_data[key + '_normal'])
 		sys.stdout.write(' "' + label + ' level on Hardcore" GAUGE Level ' + account_data[key + '_hardcore'])
 	sys.stdout.write("\n")
@@ -269,19 +198,18 @@ else:
 	for (hero_id, hero) in heroes.iteritems():
 		sys.stdout.write(timestamp + ' "Hero: ' + hero['name'] + ' (#' + hero_id + ')" "Diablo III hero" "' + hero['class'] + '"')
 		sys.stdout.write(' "Level" GAUGE Level ' + hero['level'])
-		for (label, key) in labels_attribute.iteritems():
+		for (key, label) in STATS.iteritems():
 			sys.stdout.write(' "' + label + '" GAUGE Number ' + hero[key])
 		sys.stdout.write(' "Life" GAUGE Number ' + hero['life'])
 		for i in xrange(0, len(hero['resources'])):
 			sys.stdout.write(' "Resource ' + str(i) + ' current" GAUGE Number ' + hero['resources'][i]['cur'])
 			sys.stdout.write(' "Resource ' + str(i) + ' maximum" GAUGE Number ' + hero['resources'][i]['max'])
-		for (label, key) in labels_follower.iteritems():
-			for (stat_label, stat_key) in labels_follower_stats.iteritems():
+		for (key, label) in FOLLOWERS.iteritems():
+			for (stat_key, stat_label) in FOLLOWER_STATS.iteritems():
 				sys.stdout.write(' "' + label + ' ' + stat_label + '" GAUGE Number ' + hero['follower_' + key + '_' + stat_key])
 		sys.stdout.write(' "Elite kills" GAUGE Kills ' + hero['elite_kills'])
 		sys.stdout.write(' "Elite kills /sec" COUNTER64 Kills ' + hero['elite_kills'])
 		sys.stdout.write("\n")
 		
 # }}}
-
 
