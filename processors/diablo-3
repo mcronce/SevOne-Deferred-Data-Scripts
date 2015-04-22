@@ -32,9 +32,29 @@ STATS = {
 	'intelligence' : 'Intelligence',
 	'vitality' : 'Vitality',
 	'life' : 'Life',
+	'armor' : 'Armor',
 	'damage' : 'DPS',
 	'toughness' : 'Toughness',
-	'healing' : 'Healing'
+	'healing' : 'Healing',
+	'attackSpeed' : 'Attack speed',
+	'damageIncrease' : 'Damage increase',
+	'critDamage' : 'Crit damage',
+	'critChance' : 'Crit chance',
+	'physicalResist' : 'Resist physical',
+	'fireResist' : 'Resist fire',
+	'coldResist' : 'Resist cold',
+	'lightningResist' : 'Resist lightning',
+	'poisonResist' : 'Resist poison',
+	'arcaneResist' : 'Resist arcane',
+	'blockChance' : 'Block chance',
+	'blockAmountMin' : 'Block amount (min)',
+	'blockAmountMax' : 'Block amount (max)',
+	'thorns' : 'Damage returned per hit',
+	'lifeSteal' : 'Life steal',
+	'lifePerKill' : 'Life per kill',
+	'lifeOnHit' : 'Life per hit',
+	'goldFind' : 'Gold find',
+	'magicFind' : 'Magic find'
 }
 
 FOLLOWERS = {
