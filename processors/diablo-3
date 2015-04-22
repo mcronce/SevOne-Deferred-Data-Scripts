@@ -31,7 +31,8 @@ STATS = {
 	'dexterity' : 'Dexterity',
 	'intelligence' : 'Intelligence',
 	'vitality' : 'Vitality',
-	'dps' : 'DPS',
+	'life' : 'Life',
+	'damage' : 'DPS',
 	'toughness' : 'Toughness',
 	'healing' : 'Healing'
 }
@@ -87,7 +88,7 @@ def get_highest_level(heroes, classname): # {{{
 	for hero in [hero for hero in heroes if hero['class'] == classname]:
 		if(hero['level'] > highest_level):
 			highest_level = hero['level']
-	return "NULL" if highest_level == 0 else highest_level
+	return None if highest_level == 0 else highest_level
 # }}}
 		
 # Parse command-line arguments {{{
@@ -117,47 +118,42 @@ heroes = {}
 account_data = {
 	'name' : account_data_remote['battleTag'],
 	'acts_beaten' : account_data_remote['progression'].values().count(True),
-	'elite_kills' : str(account_data_remote['kills']['elites']),
-	'lifetime_kills' : str(account_data_remote['kills']['monsters']),
-	'paragon_level' : str(account_data_remote['paragonLevel'])
+	'elite_kills' : account_data_remote['kills']['elites'],
+	'lifetime_kills' : account_data_remote['kills']['monsters'],
+	'paragon_level' : account_data_remote['paragonLevel']
 }
 for key in CLASSES.iterkeys():
-	account_data['highest_level_' + key] = str(get_highest_level(account_data_remote['heroes'], key))
-	account_data['percent_time_' + key] = str(int(100 * account_data_remote['timePlayed'][key]))
+	account_data['highest_level_' + key] = get_highest_level(account_data_remote['heroes'], key)
+	account_data['percent_time_' + key] = int(100 * account_data_remote['timePlayed'][key])
 for key in ARTISANS.iterkeys():
-	account_data[key + '_normal'] =  str(account_data_remote[key]['level'])
-	account_data[key + '_hardcore'] =  str(account_data_remote[key + 'Hardcore']['level'])
+	account_data[key + '_normal'] = account_data_remote[key]['level']
+	account_data[key + '_hardcore'] = account_data_remote[key + 'Hardcore']['level']
 
 for hero in heroes_remote.values():
 	hero_entry = {
 		'name' : hero['name'],
 		'class' : CLASSES[hero['class']],
-		'level' : str(hero['level']),
-		'paragon_level' : str(hero['paragonLevel']),
-		'dexterity' : str(hero['stats']['dexterity']),
-		'intelligence' : str(hero['stats']['intelligence']),
-		'strength' : str(hero['stats']['strength']),
-		'vitality' : str(hero['stats']['vitality']),
-		'life' : str(hero['stats']['life']),
-		'dps' : str(hero['stats']['damage']),
-		'toughness' : str(hero['stats']['toughness']),
-		'healing' : str(hero['stats']['healing']),
+		'level' : hero['level'],
+		'paragon_level' : hero['paragonLevel'],
+		'elite_kills' : hero['kills']['elites'],
 		'resources' : [
 			{
-				'cur' : str(hero['stats']['primaryResource']),
-				'max' : str(hero['stats']['primaryResource'])
+				'cur' : hero['stats']['primaryResource'],
+				'max' : hero['stats']['primaryResource']
 			},
 			{
-				'cur' : 'NULL' if hero['stats']['secondaryResource'] == 0 else str(hero['stats']['secondaryResource']),
-				'max' : 'NULL' if hero['stats']['secondaryResource'] == 0 else str(hero['stats']['secondaryResource']),
+				'cur' : None if hero['stats']['secondaryResource'] == 0 else hero['stats']['secondaryResource'],
+				'max' : None if hero['stats']['secondaryResource'] == 0 else hero['stats']['secondaryResource'],
 			}
 		]
 	}
+	for key in STATS.iterkeys():
+		hero_entry[key] = hero['stats'][key]
 	for key in FOLLOWERS.iterkeys():
-		hero_entry['follower_' + key + '_experience'] = '0' if not key in hero['followers'].keys() else str(hero['followers'][key]['stats']['experienceBonus'])
-		hero_entry['follower_' + key + '_goldfind'] = '0' if not key in hero['followers'].keys() else str(hero['followers'][key]['stats']['goldFind'])
-		hero_entry['follower_' + key + '_magicfind'] = '0' if not key in hero['followers'].keys() else str(hero['followers'][key]['stats']['magicFind'])
-	heroes[str(hero['id'])] = hero_entry
+		hero_entry['follower_' + key + '_experience'] = 0 if not key in hero['followers'].keys() else hero['followers'][key]['stats']['experienceBonus']
+		hero_entry['follower_' + key + '_goldfind'] = 0 if not key in hero['followers'].keys() else hero['followers'][key]['stats']['goldFind']
+		hero_entry['follower_' + key + '_magicfind'] = 0 if not key in hero['followers'].keys() else hero['followers'][key]['stats']['magicFind']
+	heroes[hero['id']] = hero_entry
 # }}}
 
 # Output! {{{
@@ -166,32 +162,31 @@ if(options.json):
 else:
 	sys.stdout.write(timestamp + ' "Account: ' + account_data['name'] + '" "Diablo III account" "Career stats"')
 	sys.stdout.write(' "Acts complete" GAUGE Number ' + str(account_data['acts_beaten']))
-	sys.stdout.write(' "Kills" GAUGE Kills ' + account_data['lifetime_kills'])
-	sys.stdout.write(' "Kills /sec" COUNTER64 Kills ' + account_data['lifetime_kills'])
-	sys.stdout.write(' "Elite kills" GAUGE Kills ' + account_data['elite_kills'])
-	sys.stdout.write(' "Elite kills /sec" COUNTER64 Kills ' + account_data['elite_kills'])
+	sys.stdout.write(' "Kills" GAUGE Kills ' + str(account_data['lifetime_kills']))
+	sys.stdout.write(' "Kills /sec" COUNTER64 Kills ' + str(account_data['lifetime_kills']))
+	sys.stdout.write(' "Elite kills" GAUGE Kills ' + str(account_data['elite_kills']))
+	sys.stdout.write(' "Elite kills /sec" COUNTER64 Kills ' + str(account_data['elite_kills']))
 	for (key, label) in CLASSES.iteritems():
-		sys.stdout.write(' "Time spent playing ' + label + '" GAUGE Percent ' + account_data['percent_time_' + key])
-		sys.stdout.write(' "Highest level ' + label + '" GAUGE Level ' + account_data['highest_level_' + key])
+		sys.stdout.write(' "Time spent playing ' + label + '" GAUGE Percent ' + str(account_data['percent_time_' + key]))
+		sys.stdout.write(' "Highest level ' + label + '" GAUGE Level ' + str(account_data['highest_level_' + key]))
 	for (key, label) in ARTISANS.iteritems():
-		sys.stdout.write(' "' + label + ' level on Normal" GAUGE Level ' + account_data[key + '_normal'])
-		sys.stdout.write(' "' + label + ' level on Hardcore" GAUGE Level ' + account_data[key + '_hardcore'])
+		sys.stdout.write(' "' + label + ' level on Normal" GAUGE Level ' + str(account_data[key + '_normal']))
+		sys.stdout.write(' "' + label + ' level on Hardcore" GAUGE Level ' + str(account_data[key + '_hardcore']))
 	sys.stdout.write("\n")
 
 	for (hero_id, hero) in heroes.iteritems():
-		sys.stdout.write(timestamp + ' "Hero: ' + hero['name'] + ' (#' + hero_id + ')" "Diablo III hero" "' + hero['class'] + '"')
-		sys.stdout.write(' "Level" GAUGE Level ' + hero['level'])
+		sys.stdout.write(timestamp + ' "Hero: ' + hero['name'] + ' (#' + str(hero_id) + ')" "Diablo III hero" "' + hero['class'] + '"')
+		sys.stdout.write(' "Level" GAUGE Level ' + str(hero['level']))
 		for (key, label) in STATS.iteritems():
-			sys.stdout.write(' "' + label + '" GAUGE Number ' + hero[key])
-		sys.stdout.write(' "Life" GAUGE Number ' + hero['life'])
+			sys.stdout.write(' "' + label + '" GAUGE Number ' + str(hero[key]))
 		for i in xrange(0, len(hero['resources'])):
-			sys.stdout.write(' "Resource ' + str(i) + ' current" GAUGE Number ' + hero['resources'][i]['cur'])
-			sys.stdout.write(' "Resource ' + str(i) + ' maximum" GAUGE Number ' + hero['resources'][i]['max'])
+			sys.stdout.write(' "Resource ' + str(i) + ' current" GAUGE Number ' + str(hero['resources'][i]['cur']))
+			sys.stdout.write(' "Resource ' + str(i) + ' maximum" GAUGE Number ' + str(hero['resources'][i]['max']))
 		for (key, label) in FOLLOWERS.iteritems():
 			for (stat_key, stat_label) in FOLLOWER_STATS.iteritems():
-				sys.stdout.write(' "' + label + ' ' + stat_label + '" GAUGE Number ' + hero['follower_' + key + '_' + stat_key])
-		sys.stdout.write(' "Elite kills" GAUGE Kills ' + hero['elite_kills'])
-		sys.stdout.write(' "Elite kills /sec" COUNTER64 Kills ' + hero['elite_kills'])
+				sys.stdout.write(' "' + label + ' ' + stat_label + '" GAUGE Number ' + str(hero['follower_' + key + '_' + stat_key]))
+		sys.stdout.write(' "Elite kills" GAUGE Kills ' + str(hero['elite_kills']))
+		sys.stdout.write(' "Elite kills /sec" COUNTER64 Kills ' + str(hero['elite_kills']))
 		sys.stdout.write("\n")
 		
 # }}}
