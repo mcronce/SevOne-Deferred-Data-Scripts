@@ -1,10 +1,7 @@
 #!/usr/bin/python2.7
-import calendar
-import datetime
 import json
 import optparse
 import sys
-import time
 import urllib2
 
 # Constants {{{
@@ -123,7 +120,6 @@ if(len(args) != 1):
 (profile_name,) = args
 # }}}
 
-timestamp = str(int(calendar.timegm(datetime.datetime.utcnow().timetuple())))
 # Go out and grab all our data from the API {{{
 profile_url = URL_BASE + profile_name + '/'
 
@@ -137,6 +133,7 @@ for hero in account_data_remote['heroes']:
 heroes = {}
 account_data = {
 	'name' : account_data_remote['battleTag'],
+	'updated_time' : account_data_remote['lastUpdated'],
 	'acts_beaten' : account_data_remote['progression'].values().count(True),
 	'elite_kills' : account_data_remote['kills']['elites'],
 	'lifetime_kills' : account_data_remote['kills']['monsters'],
@@ -152,6 +149,7 @@ for key in ARTISANS.iterkeys():
 for hero in heroes_remote.values():
 	hero_entry = {
 		'name' : hero['name'],
+		'updated_time' : hero['last-updated'],
 		'class' : CLASSES[hero['class']],
 		'level' : hero['level'],
 		'paragon_level' : hero['paragonLevel'],
@@ -180,7 +178,7 @@ for hero in heroes_remote.values():
 if(options.json):
 	print json.dumps({'account_data' : account_data, 'heroes' : heroes}, sort_keys = True, indent = 4)
 else:
-	sys.stdout.write(timestamp + ' "Account: ' + account_data['name'] + '" "Diablo III account" "Career stats"')
+	sys.stdout.write(str(account_data['updated_time']) + ' "Account: ' + account_data['name'] + '" "Diablo III account" "Career stats"')
 	sys.stdout.write(' "Acts complete" GAUGE Number ' + str(account_data['acts_beaten']))
 	sys.stdout.write(' "Kills" GAUGE Kills ' + str(account_data['lifetime_kills']))
 	sys.stdout.write(' "Kills /sec" COUNTER64 Kills ' + str(account_data['lifetime_kills']))
@@ -195,7 +193,7 @@ else:
 	sys.stdout.write("\n")
 
 	for (hero_id, hero) in heroes.iteritems():
-		sys.stdout.write(timestamp + ' "Hero: ' + hero['name'] + ' (#' + str(hero_id) + ')" "Diablo III hero" "' + hero['class'] + '"')
+		sys.stdout.write(str(hero['updated_time']) + ' "Hero: ' + hero['name'] + ' (#' + str(hero_id) + ')" "Diablo III hero" "' + hero['class'] + '"')
 		sys.stdout.write(' "Level" GAUGE Level ' + str(hero['level']))
 		for (key, label) in STATS.iteritems():
 			sys.stdout.write(' "' + label + '" GAUGE Number ' + str(hero[key]))
