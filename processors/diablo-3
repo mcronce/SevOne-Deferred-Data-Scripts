@@ -180,6 +180,7 @@ if(options.json):
 else:
 	sys.stdout.write(str(account_data['updated_time']) + ' "Account: ' + account_data['name'] + '" "Diablo III account" "Career stats"')
 	sys.stdout.write(' "Acts complete" GAUGE Number ' + str(account_data['acts_beaten']))
+	sys.stdout.write(' "Highest Paragon level" GAUGE Level ' + str(account_data['paragon_level']))
 	sys.stdout.write(' "Kills" GAUGE Kills ' + str(account_data['lifetime_kills']))
 	sys.stdout.write(' "Kills /sec" COUNTER64 Kills ' + str(account_data['lifetime_kills']))
 	sys.stdout.write(' "Elite kills" GAUGE Kills ' + str(account_data['elite_kills']))
@@ -195,6 +196,7 @@ else:
 	for (hero_id, hero) in heroes.iteritems():
 		sys.stdout.write(str(hero['updated_time']) + ' "Hero: ' + hero['name'] + ' (#' + str(hero_id) + ')" "Diablo III hero" "' + hero['class'] + '"')
 		sys.stdout.write(' "Level" GAUGE Level ' + str(hero['level']))
+		sys.stdout.write(' "Paragon level" GAUGE Level ' + str(hero['paragon_level']))
 		for (key, label) in STATS.iteritems():
 			sys.stdout.write(' "' + label + '" GAUGE Number ' + str(hero[key]))
 		for i in xrange(0, len(hero['resources'])):
