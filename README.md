@@ -327,8 +327,8 @@ indicators about the indoor/outdoor state and state of the system.
 
 
 
-path-of-exile
-=============
+games/path-of-exile
+===================
 * Language:  Python
 * Type:      Screen scraper
 * Reference: http://www.pathofexile.com/
@@ -605,8 +605,8 @@ active, in trash, in version control, in cache, and in the gallery.
 
 
 
-diablo-3
-========
+games/diablo-3
+==============
 * Language:  Python
 * Type:      Screen scraper
 * Reference: http://us.battle.net/d3/en/
