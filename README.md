@@ -626,3 +626,29 @@ as an example URL, we have the following:
 
 "Derp-1915" would be the Profile-ID, in this case.
 
+
+
+magelo-eq
+=========
+* Language:  Python 2.7
+* Type:      Screen scraper
+* Reference: http://eq.magelo.com/
+* Usage:
+
+
+    magelo-eq Profile-ID
+    magelo-eq 665922
+
+This processor scrapes web statistics about an EverQuest 1 character from
+magelo.com's web interface.
+
+To find the Profile-ID for your character, look at the URL for your web
+profile; as an example URL, we have the following:
+
+    http://eq.magelo.com/profile/665922
+
+"665922" would be the Profile-ID, in this case.
+
+Currently, you must run a separate script for each profile ID you wish to
+poll.  That will change in the future.
+
