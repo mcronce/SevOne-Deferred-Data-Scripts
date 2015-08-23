@@ -1,0 +1,126 @@
+#!/usr/bin/python2.7
+import calendar
+import lxml.html
+import mechanize
+import optparse
+import re
+import sys
+import time
+
+# Constants {{{
+regex_number = re.compile('-?[0-9,.]+')
+regex_last_updated = re.compile('var\s*lastUpdated\s*=\s*new\s*Date\s*\(\s*([0-9]+)\s*\)\s*;')
+regex_identity = re.compile('^\s*([0-9]+)\s+([A-Za-z- ]+)\s+([A-Za-z- ]+)\s+-\s+([A-Za-z- ]+)\s*$', re.MULTILINE)
+
+stat_labels = {
+	'HP' : ('Health', 'Health'),
+	'MANA' : ('Mana', 'Mana'),
+	'ENDR' : ('Endurance', 'Endurance'),
+	'AC' : ('Armor', 'Armor'),
+	'ATK' : ('Attack', 'Attack'),
+	'AA' : ('Alternate advancement points', 'Points'),
+	'HP+' : ('Health regeneration', 'Regeneration'),
+	'MANA+' : ('Mana regeneration', 'Regeneration'),
+	'HASTE' : ('Haste', 'Haste'),
+	'STR' : ('Strength', 'Strength'),
+	'STA' : ('Stamina', 'Stamina'),
+	'AGI' : ('Agility', 'Agility'),
+	'DEX' : ('Dexterity', 'Dexterity'),
+	'WIS' : ('Wisdom', 'Wisdom'),
+	'INT' : ('Intelligence', 'Intelligence'),
+	'CHA' : ('Charisma', 'Charisma'),
+	'Poison' : ('SV Poison', 'Resist'),
+	'Magic' : ('SV Magic', 'Resist'),
+	'Disease' : ('SV Disease', 'Resist'),
+	'Fire' : ('SV Fire', 'Resist'),
+	'Cold' : ('SV Cold', 'Resist'),
+	'Corrupt' : ('SV Corruption', 'Resist'),
+	'Weight' : ('Weight', 'Weight')
+}
+# }}}
+
+def get_numbers(string): # {{{
+	numbers = regex_number.findall(string)
+	if(len(numbers) == 0):
+		return ['NULL']
+	
+	for i in xrange(len(numbers)):
+		numbers[i] = numbers[i].replace(',', '')
+	
+	return numbers
+# }}}
+
+# Parse command-line arguments {{{
+cmdline = optparse.OptionParser(usage = 'usage: %prog profile-id')
+
+(options, args) = cmdline.parse_args()
+if(len(args) != 1):
+	cmdline.print_help()
+	sys.exit(1)
+
+url = 'http://eq.magelo.com/profile/' + args[0]
+# }}}
+
+# Browser setup {{{
+# Initialize the browser
+br = mechanize.Browser()
+
+# Enable some handlers
+br.set_handle_equiv(True)
+br.set_handle_gzip(True) # Required for Magelo
+br.set_handle_redirect(True)
+br.set_handle_referer(True)
+br.set_handle_robots(False)
+
+# Don't hang on >0 refresh times
+br.set_handle_refresh(mechanize._http.HTTPRefreshProcessor(), max_time = 1)
+
+# Lie, cheat, and steal
+br.addheaders = [('User-agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31 AlexaToolbar/alxg-3.1')]
+# }}}
+
+# Retrieve the main page, parse into an XML document, and get the last-updated timestamp
+response = br.open(url)
+page = response.read()
+page = lxml.html.fromstring(page)
+body = page.cssselect('html > body')[0]
+timestamp = regex_last_updated.findall(body.cssselect('script')[0].text)[0]
+timestamp = str(float(timestamp) / 1000.0)
+
+# Find the profile panes and grab some character metadata
+profile = body.cssselect('div#profile')[0]
+main_window = profile.cssselect('div#mainWindow')[0]
+identity = main_window.cssselect('div#identity')[0]
+identity_matches = regex_identity.match(identity.cssselect('span')[1].text.strip()).groups()
+character = {
+	'name' : identity.cssselect('span#name')[0].text.strip(),
+	'level' : identity_matches[0],
+	'race' : identity_matches[1],
+	'class' : identity_matches[2],
+	'server' : identity_matches[3],
+	'stats' : {}
+}
+
+# Grab the stats panel; parse stuff out of it
+player_tab = main_window.cssselect('div#playerOngletContent > div#playerTabContent')[0]
+stat_table = player_tab.cssselect('div#equipment > table#statTable > tr')
+for row in stat_table:
+	try:
+		label = row.cssselect('td.tabCat')
+		value = row.cssselect('td.tabCel')
+		if(len(label) != 1 or len(value) != 1):
+			continue
+		label = label[0].text.strip()
+		value = value[0].text.strip()
+		if(not label in stat_labels.keys()):
+			continue
+		character['stats'][label] = get_numbers(value)[0]
+	except e:
+		continue
+
+sys.stdout.write(timestamp + ' "' + character['name'] + ' (' + character['server'] + ')" "EverQuest character" "' + character['race'] + ' ' + character['class'] + '"')
+sys.stdout.write(' Level GAUGE Level ' + character['level'])
+for key, value in character['stats'].iteritems():
+	sys.stdout.write(' "' + stat_labels[key][0] + '" GAUGE "' + stat_labels[key][1] + '" ' + str(value))
+sys.stdout.write("\n")
+
