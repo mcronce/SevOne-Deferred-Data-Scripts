@@ -1,5 +1,7 @@
 #!/usr/bin/python2.7
 import calendar
+import execjs
+import json
 import lxml.html
 import mechanize
 import optparse
@@ -12,34 +14,180 @@ regex_number = re.compile('-?[0-9,.]+')
 regex_last_updated = re.compile('var\s*lastUpdated\s*=\s*new\s*Date\s*\(\s*([0-9]+)\s*\)\s*;')
 regex_identity = re.compile('^\s*([0-9]+)\s+([A-Za-z- ]+)\s+([A-Za-z- ]+)\s+-\s+([A-Za-z- ]+)\s*$', re.MULTILINE)
 regex_skills = re.compile('\s+(skills|tradeskills|languages)\[\s*[0-9]+\s*\]\s*=\s*new\s*Skill\s*\(\s*\'[^\']+\'\s*,\s*([0-9]+)\s*[,\)]')
+regex_windows_newlines = re.compile("\r\n")
 #regex_skills_trade = re.compile('^\s*skills\[[0-9]+\]\s*=\s*new\s*Skill\s*\(\'[^\']+\'\s*,\s*([0-9]+)\s*,')
 #regex_skills_language = re.compile('^\s*skills\[[0-9]+\]\s*=\s*new\s*Skill\s*\(\'[^\']+\'\s*,\s*([0-9]+)\s*,')
 
 stat_labels = {
-	'HP' : ('Health', 'Health'),
-	'MANA' : ('Mana', 'Mana'),
-	'ENDR' : ('Endurance', 'Endurance'),
-	'AC' : ('Armor', 'Armor'),
-	'ATK' : ('Attack', 'Attack'),
-	'AA' : ('Alternate advancement points', 'Points'),
-	'HP+' : ('Health regeneration', 'Regeneration'),
-	'MANA+' : ('Mana regeneration', 'Regeneration'),
-	'HASTE' : ('Haste', 'Haste'),
-	'STR' : ('Strength', 'Strength'),
-	'STA' : ('Stamina', 'Stamina'),
-	'AGI' : ('Agility', 'Agility'),
-	'DEX' : ('Dexterity', 'Dexterity'),
-	'WIS' : ('Wisdom', 'Wisdom'),
-	'INT' : ('Intelligence', 'Intelligence'),
-	'CHA' : ('Charisma', 'Charisma'),
-	'Poison' : ('SV Poison', 'Resist'),
-	'Magic' : ('SV Magic', 'Resist'),
-	'Disease' : ('SV Disease', 'Resist'),
-	'Fire' : ('SV Fire', 'Resist'),
-	'Cold' : ('SV Cold', 'Resist'),
-	'Corrupt' : ('SV Corruption', 'Resist'),
-	'Weight' : ('Weight', 'Weight')
+	'basic' : {
+		'HP' : ('Health', 'Health'),
+		'MANA' : ('Mana', 'Mana'),
+		'ENDR' : ('Endurance', 'Endurance'),
+		'AC' : ('Armor', 'Armor'),
+		'ATK' : ('Attack', 'Attack'),
+		'AA' : ('Alternate advancement points', 'Points'),
+		'HP+' : ('Health regeneration', 'Regeneration'),
+		'MANA+' : ('Mana regeneration', 'Regeneration'),
+		'HASTE' : ('Haste', 'Haste'),
+		'STR' : ('Strength', 'Strength'),
+		'STA' : ('Stamina', 'Stamina'),
+		'AGI' : ('Agility', 'Agility'),
+		'DEX' : ('Dexterity', 'Dexterity'),
+		'WIS' : ('Wisdom', 'Wisdom'),
+		'INT' : ('Intelligence', 'Intelligence'),
+		'CHA' : ('Charisma', 'Charisma'),
+		'Poison' : ('SV Poison', 'Resist'),
+		'Magic' : ('SV Magic', 'Resist'),
+		'Disease' : ('SV Disease', 'Resist'),
+		'Fire' : ('SV Fire', 'Resist'),
+		'Cold' : ('SV Cold', 'Resist'),
+		'Corrupt' : ('SV Corruption', 'Resist'),
+		'Weight' : ('Weight', 'Weight')
+	},
+	'advanced' : {
+		'strikethrough' : ('Strikethrough', 'Strikethrough'),
+		'hcha' : ('Heroic charisma', 'Chrisma'),
+		'dotShielding' : ('DOT shielding', 'Shielding'),
+		'avoidance' : ('Avoidance', 'Avoidance'),
+		'spellDmg' : ('Spell damage', 'Damage'),
+		'brass' : ('Brass instruments', 'Instruments'),
+		'combat' : ('Combat effects', 'Combat effects'),
+		'hpr' : ('Heroic SV Poison', 'Resist'),
+		'percu' : ('Percussion instruments', 'Instruments'),
+		'clairvoyance' : ('Clairvoyance', 'Clairvoyance'),
+		'hwis' : ('Heroic wisdom', 'Wisdom'),
+		'stun' : ('Stun resistance', 'Stun resistance'),
+		'accuracy' : ('Accuracy', 'Accuracy'),
+		'hcr' : ('Heroic SV Cold', 'Resist'),
+		'shielding' : ('Shielding', 'Shielding'),
+		'string' : ('String instruments', 'Instruments'),
+		'spellShield' : ('Spell shielding', 'Shielding'),
+		'hstr' : ('Heroic strength', 'Strength'),
+		'hcor' : ('Heroic SV Corruption', 'Resist'),
+		'hmr' : ('Heroic SV Magic', 'Resist'),
+		'bsDmg' : ('Backstab damage', 'Damage'),
+		'sing' : ('Singing', 'Instruments'),
+		'hsta' : ('Heroic stamina', 'Stamina'),
+		'hdr' : ('Heroic SV Disease', 'Resist'),
+		'dmgShield' : ('Damage shield', 'Damage'),
+		'healAmount' : ('Heal amount', 'Damage'),
+		'hagi' : ('Heroic agility', 'Agility'),
+		'hdex' : ('Heroic dexterity', 'Dexterity'),
+		'wind' : ('Wind instruments', 'Instruments')
+	}
 }
+
+# Have to add a bunch of function declarations to make the Magelo JS parse...
+js_prefix = """// {{{
+var items = [];
+var abilities = [];
+var abilityGrpTab = [];
+var itemModifiers = {};
+var modifiers = {};
+var skills = [];
+var tradeskills = [];
+var languages = [];
+var itemEffects = [];
+var keys = [];
+var flags = [];
+
+function Item(id, name, icon, description, stackable, quantity, bag_size, swap, augments) {
+	return {
+		'id' : id,
+		'name' : name,
+		'icon' : icon,
+		'description' : description,
+		'stackable' : stackable,
+		'quantity' : quantity,
+		'bag_size' : bag_size,
+		'swap' : swap,
+		'augments' : augments
+	};
+}
+
+function Ability(name, description, category, current, max, base, progression, next_cost) {
+	return {
+		'name' : name,
+		'description' : description,
+		'current' : current,
+		'max' : max,
+		'base' : base,
+		'progression' : progression,
+		'next_cost' : next_cost
+	};
+}
+
+function AbilityGrp(id, xp, assigned, unspent, spent) {
+	return {
+		'id' : id,
+		'xp' : xp,
+		'assigned' : assigned,
+		'unspent' : unspent,
+		'spent' : spent
+	};
+}
+
+function ItemModifier(item_index, value, aug_values) {
+	return {
+		'item_index' : item_index,
+		'value' : value,
+		'aug_values' : aug_values
+	};
+}
+
+function Modifier(summable, cap) {
+	return {
+		'summable' : summable,
+		'cap' : cap
+	};
+}
+
+function Skill(name, value, is_tradeskill, mod, cap) {
+	return {
+		'name' : name,
+		'value' : value,
+		'is_tradeskill' : is_tradeskill,
+		'mod' : mod,
+		'cap' : cap
+	};
+}
+
+function ItemEffect(id, name, type, slot, indoor, casting_time, description) {
+	return {
+		'id' : id,
+		'name' : name,
+		'type' : type,
+		'slot' : slot,
+		'indoor' : indoor,
+		'casting_time' : casting_time,
+		'description' : description
+	};
+}
+
+function Key(name) {
+	return {'name' : name};
+}
+
+function Flag(name) {
+	return {'name' : name};
+}
+
+function get_stuff() {
+	return {
+		'items' : items,
+		'abilities' : abilities,
+		'ability_groups' : abilityGrpTab,
+		'item_modifiers' : itemModifiers,
+		'modifiers' : modifiers,
+		'skills' : skills,
+		'tradeskills' : tradeskills,
+		'languages' : languages,
+		'item_effects' : itemEffects,
+		'keys' : keys,
+		'flags' : flags
+	};
+}
+/* }}} */"""
 # }}}
 
 def get_numbers(string): # {{{
@@ -122,7 +270,7 @@ for row in stat_table:
 			continue
 		label = label[0].text.strip()
 		value = value[0].text.strip()
-		if(not label in stat_labels.keys()):
+		if(not label in stat_labels['basic'].keys()):
 			continue
 		character['stats'][label] = get_numbers(value)[0]
 	except e:
@@ -164,11 +312,34 @@ try:
 except:
 	character['platinum_sharedbank'] = 0
 
+# Advanced modifiers...these will be a little more complex, requiring the ExecJS engine
+js = execjs.get()
+# Chop off the top 101 lines of this JS - we don't care about them
+js_code = body.cssselect('script')[0].text.split('\n')
+js_code = "\n".join(js_code[:10]) + js_prefix + "\n\n" + regex_windows_newlines.sub("\n", "\n".join(js_code[102:]))
+jsc = js.compile(js_code)
+stuff_from_page = jsc.call('get_stuff')
+for key, stat in stuff_from_page['item_modifiers'].items():
+	if(len(stat) < 1):
+		stuff_from_page['item_modifiers'][key] = 0
+	elif(stuff_from_page['modifiers'].has_key(key) and not stuff_from_page['modifiers'][key]['summable']):
+		stuff_from_page['item_modifiers'][key] = max([mod['value'] for mod in stat])
+	else:
+		stuff_from_page['item_modifiers'][key] = sum([mod['value'] for mod in stat])
+
+for key, stat in stuff_from_page['item_modifiers'].items():
+	if(stuff_from_page['modifiers'].has_key(key) and stuff_from_page['modifiers'][key]['cap'] != -1):
+		if(stat > stuff_from_page['modifiers'][key]['cap']):
+			stuff_from_page['item_modifiers'][key] = stuff_from_page['modifiers'][key]['cap']
+
 sys.stdout.write(timestamp + ' "' + character['name'] + ' (' + character['server'] + ')" "EverQuest character" "' + character['race'] + ' ' + character['class'] + '"')
 sys.stdout.write(' Level GAUGE Level ' + character['level'])
 sys.stdout.write(' "Experience toward next level" GAUGE Percent ' + str(character['xp_pct'] * 100))
 for key, value in character['stats'].iteritems():
-	sys.stdout.write(' "' + stat_labels[key][0] + '" GAUGE "' + stat_labels[key][1] + '" ' + str(value))
+	sys.stdout.write(' "' + stat_labels['basic'][key][0] + '" GAUGE "' + stat_labels['basic'][key][1] + '" ' + str(value))
+for key, value in stuff_from_page['item_modifiers'].iteritems():
+	if(key in stat_labels['advanced'].keys()):
+		sys.stdout.write(' "' + stat_labels['advanced'][key][0] + '" GAUGE "' + stat_labels['advanced'][key][1] + '" ' + str(value))
 sys.stdout.write(' "Total of combat skill levels" GAUGE Skills ' + str(character['skills']['skills']))
 sys.stdout.write(' "Total of trade skill levels" GAUGE Skills ' + str(character['skills']['tradeskills']))
 sys.stdout.write(' "Total of language skill levels" GAUGE Skills ' + str(character['skills']['languages']))
