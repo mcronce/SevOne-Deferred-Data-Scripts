@@ -11,6 +11,9 @@ import time
 regex_number = re.compile('-?[0-9,.]+')
 regex_last_updated = re.compile('var\s*lastUpdated\s*=\s*new\s*Date\s*\(\s*([0-9]+)\s*\)\s*;')
 regex_identity = re.compile('^\s*([0-9]+)\s+([A-Za-z- ]+)\s+([A-Za-z- ]+)\s+-\s+([A-Za-z- ]+)\s*$', re.MULTILINE)
+regex_skills = re.compile('\s+(skills|tradeskills|languages)\[\s*[0-9]+\s*\]\s*=\s*new\s*Skill\s*\(\s*\'[^\']+\'\s*,\s*([0-9]+)\s*[,\)]')
+#regex_skills_trade = re.compile('^\s*skills\[[0-9]+\]\s*=\s*new\s*Skill\s*\(\'[^\']+\'\s*,\s*([0-9]+)\s*,')
+#regex_skills_language = re.compile('^\s*skills\[[0-9]+\]\s*=\s*new\s*Skill\s*\(\'[^\']+\'\s*,\s*([0-9]+)\s*,')
 
 stat_labels = {
 	'HP' : ('Health', 'Health'),
@@ -48,6 +51,13 @@ def get_numbers(string): # {{{
 		numbers[i] = numbers[i].replace(',', '')
 	
 	return numbers
+# }}}
+
+def get_progress_bar_pct(elem, img_selector): # {{{
+	style = elem.get('style').strip(';').split(';')
+	style = {pair[0] : get_numbers(pair[1])[0] for pair in [item.split(':') for item in style]}
+	img = elem.cssselect(img_selector)[0]
+	return (float(img.get('width')) + 8) / (float(style['width']) - 4)
 # }}}
 
 # Parse command-line arguments {{{
@@ -117,10 +127,53 @@ for row in stat_table:
 		character['stats'][label] = get_numbers(value)[0]
 	except e:
 		continue
+character['xp_pct'] = get_progress_bar_pct(main_window.cssselect('div#equipment > div#progressBar1')[0], 'img#totoImg')
+
+# Money
+money_rows = player_tab.cssselect('div#money > table#moneyTable > tr > td.moneyTabCel')
+try:
+	character['platinum_onchar'] = float(money_rows[0].text)
+except:
+	character['platinum_onchar'] = float(0)
+try:
+	character['platinum_onchar'] += 0.1 * float(money_rows[1].text)
+except:
+	pass
+
+# Next, skills
+character['skills'] = {'skills' : 0, 'tradeskills' : 0, 'languages' : 0}
+for script in page.cssselect('html > body > script'):
+	skill_lines = regex_skills.findall(script.text)
+	if(len(skill_lines) > 0):
+		for (cat, value) in skill_lines:
+			character['skills'][cat] += int(value)
+
+# Bank (money)
+bank = profile.cssselect('div#bank')[0]
+money_rows = bank.cssselect('table#bankTable > tr > td.moneyTabCel')
+try:
+	character['platinum_bank'] = float(money_rows[0].text)
+except:
+	character['platinum_bank'] = float(0)
+try:
+	character['platinum_bank'] += 0.1 * float(money_rows[1].text)
+except:
+	pass
+try:
+	character['platinum_sharedbank'] = int(bank.cssselect('table#sharedBankTable > tr > td.moneyTabCel')[0].text)
+except:
+	character['platinum_sharedbank'] = 0
 
 sys.stdout.write(timestamp + ' "' + character['name'] + ' (' + character['server'] + ')" "EverQuest character" "' + character['race'] + ' ' + character['class'] + '"')
 sys.stdout.write(' Level GAUGE Level ' + character['level'])
+sys.stdout.write(' "Experience toward next level" GAUGE Percent ' + str(character['xp_pct'] * 100))
 for key, value in character['stats'].iteritems():
 	sys.stdout.write(' "' + stat_labels[key][0] + '" GAUGE "' + stat_labels[key][1] + '" ' + str(value))
+sys.stdout.write(' "Total of combat skill levels" GAUGE Skills ' + str(character['skills']['skills']))
+sys.stdout.write(' "Total of trade skill levels" GAUGE Skills ' + str(character['skills']['tradeskills']))
+sys.stdout.write(' "Total of language skill levels" GAUGE Skills ' + str(character['skills']['languages']))
+sys.stdout.write(' "Money on character" GAUGE Platinum ' + str(character['platinum_onchar']))
+sys.stdout.write(' "Money in bank" GAUGE Platinum ' + str(character['platinum_bank']))
+sys.stdout.write(' "Money in shared bank" GAUGE Platinum ' + str(character['platinum_sharedbank']))
 sys.stdout.write("\n")
 
