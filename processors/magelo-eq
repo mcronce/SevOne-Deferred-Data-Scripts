@@ -251,7 +251,7 @@ main_window = profile.cssselect('div#mainWindow')[0]
 identity = main_window.cssselect('div#identity')[0]
 identity_matches = regex_identity.match(identity.cssselect('span')[1].text.strip()).groups()
 character = {
-	'name' : identity.cssselect('span#name')[0].text.strip(),
+	'name' : identity.cssselect('span#name')[0].text.strip().split(u'\xa0')[0].strip(),
 	'level' : identity_matches[0],
 	'race' : identity_matches[1],
 	'class' : identity_matches[2],
