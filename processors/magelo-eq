@@ -275,7 +275,10 @@ for row in stat_table:
 		character['stats'][label] = get_numbers(value)[0]
 	except e:
 		continue
-character['xp_pct'] = get_progress_bar_pct(main_window.cssselect('div#equipment > div#progressBar1')[0], 'img#totoImg')
+try:
+	character['xp_pct'] = get_progress_bar_pct(main_window.cssselect('div#equipment > div#progressBar1')[0], 'img#totoImg')
+except:
+	character['xp_pct'] = 0
 
 # Money
 money_rows = player_tab.cssselect('div#money > table#moneyTable > tr > td.moneyTabCel')
