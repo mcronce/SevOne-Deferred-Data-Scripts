@@ -73,7 +73,8 @@ stat_labels = {
 		'healAmount' : ('Heal amount', 'Damage'),
 		'hagi' : ('Heroic agility', 'Agility'),
 		'hdex' : ('Heroic dexterity', 'Dexterity'),
-		'wind' : ('Wind instruments', 'Instruments')
+		'wind' : ('Wind instruments', 'Instruments'),
+		'hinte' : ('Heroic intelligence', 'Intelligence')
 	}
 }
 
