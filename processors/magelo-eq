@@ -207,8 +207,8 @@ def get_progress_bar_pct(elem, img_selector): # {{{
 	style = {pair[0] : get_numbers(pair[1])[0] for pair in [item.split(':') for item in style]}
 	img = elem.cssselect(img_selector)[0]
 	original_pct = (float(img.get('width')) + 8) / (float(style['width']) - 4)
-	if(original_pct > 12):
-		return (original_pct - 12) * 1.179
+	if(original_pct > 0.12):
+		return (original_pct - 0.12) * 1.179
 	else:
 		return original_pct
 # }}}
