@@ -608,7 +608,7 @@ active, in trash, in version control, in cache, and in the gallery.
 games/diablo-3
 ==============
 * Language:  Python
-* Type:      Screen scraper
+* Type:      API
 * Reference: http://us.battle.net/d3/en/
 * Usage:
 
@@ -617,7 +617,7 @@ games/diablo-3
     diablo-3 Derp-1915
 
 This processor scrapes statistics about a Diablo 3 character and account from
-Blizzard's character viewer web interface.
+Blizzard's community stats REST API.
 
 To find the Profile-ID for your account, look at the URL for your web profile;
 as an example URL, we have the following:
