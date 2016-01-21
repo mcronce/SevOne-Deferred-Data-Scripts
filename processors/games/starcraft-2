@@ -1,0 +1,122 @@
+#!/usr/bin/python2.7
+import datetime
+import json
+import optparse
+import sys
+import time
+import urllib2
+
+# Constants {{{
+DOMAIN = 'http://us.battle.net'
+URL_BASE = DOMAIN + '/api/sc2/'
+PROFILE_BASE = URL_BASE + 'profile/'
+ACHIEVEMENT_URL = URL_BASE + 'data/achievements'
+
+RACES = {
+	'terran' : 'Terran',
+	'zerg' : 'Zerg',
+	'protoss' : 'Protoss'
+}
+# }}}
+
+# CLEVERLY NAMED function to retrieve a remote URL
+def curl(url, data = None): # {{{
+	req = urllib2.Request(url)
+
+	if(data != None):
+		req.add_data(urllib.urlencode(data))
+
+	try:
+		handle = urllib2.urlopen(req)
+	except IOError, e:
+		return ''
+	
+	data = handle.read()
+	return data 
+# }}}
+
+def curl_json(url, data = None): # {{{
+	jsonSuccess = False
+	failCount = 0
+	while(failCount < 5 and not jsonSuccess):
+		try:
+			daters = json.loads(curl(url, data))
+			jsonSuccess = True
+		except:
+			#print 'derped. herping again'
+			failCount = failCount + 1
+			jsonSuccess = False
+	if(failCount >= 5):
+		sys.exit(2)
+	return daters
+# }}}
+
+def get_categories(): # {{{
+	everything = curl_json(ACHIEVEMENT_URL)
+	return {category['categoryId'] : category['title'] for category in everything['categories']}
+# }}}
+
+# Parse command-line arguments {{{
+cmdline = optparse.OptionParser(usage = 'usage: %prog profile-path')
+cmdline.add_option('-j', '--json', action = 'store_true', dest = 'json', default = False, help = 'Output pretty JSON instead of SevOne-consumable text')
+
+(options, args) = cmdline.parse_args()
+if(len(args) != 1):
+	cmdline.print_help()
+	sys.exit(1)
+
+(profile_path,) = args
+# }}}
+
+# Go out and grab all our data from the API {{{
+profile_url = PROFILE_BASE + profile_path + '/'
+account_data_remote = curl_json(profile_url)
+categories = get_categories()
+# }}}
+
+# Scrub it and make the data structures with just stuff we care about {{{
+account_data = {
+	'name' : account_data_remote['displayName'],
+	'games_season' : account_data_remote['career']['seasonTotalGames'],
+	'games_career' : account_data_remote['career']['careerTotalGames'],
+	'games_this_season' : account_data_remote['season']['totalGamesThisSeason'],
+	'achievement_points_total' : account_data_remote['achievements']['points']['totalPoints'],
+	'achievements_total' : len(account_data_remote['achievements']['achievements']),
+	'achievement_points' : {},
+	'races' : {}
+}
+
+for key in RACES.iterkeys():
+	account_data['races'][key] = {
+		'wins' : account_data_remote['career'][key + 'Wins'],
+		'level' : account_data_remote['swarmLevels'][key]['level'],
+		'xp' : account_data_remote['swarmLevels'][key]['currentLevelXP'],
+		'xp_tnl' : account_data_remote['swarmLevels'][key]['totalLevelXP'] - account_data_remote['swarmLevels'][key]['currentLevelXP']
+	}
+
+account_data['achievement_points'] = {}
+for (category_id, points) in account_data_remote['achievements']['points']['categoryPoints'].iteritems():
+	account_data['achievement_points'][categories[int(category_id)]] = points
+# }}}
+
+# Output! {{{
+if(options.json):
+	print json.dumps({'account_data' : account_data}, sort_keys = True, indent = 4)
+else:
+	timestamp = str(int(time.mktime(datetime.datetime.now().timetuple())))
+	sys.stdout.write(timestamp + ' "' + account_data['name'] + '" "Starcraft II profile" "Profile stats"')
+	sys.stdout.write(' "Total season games" GAUGE Games ' + str(account_data['games_season']))
+	sys.stdout.write(' "Total career games" GAUGE Games ' + str(account_data['games_career']))
+	sys.stdout.write(' "Games this season" GAUGE Games ' + str(account_data['games_this_season']))
+	sys.stdout.write(' "Total achievement points" GAUGE Points ' + str(account_data['achievement_points_total']))
+	sys.stdout.write(' "Total achievements" GAUGE Achievements ' + str(account_data['achievements_total']))
+	for (key, name) in RACES.iteritems():
+		sys.stdout.write(' "' + name + ' wins" GAUGE Games ' + str(account_data['races'][key]['wins']))
+		sys.stdout.write(' "' + name + ' level" GAUGE Level ' + str(account_data['races'][key]['level']))
+		sys.stdout.write(' "' + name + ' experience" GAUGE Experience ' + str(account_data['races'][key]['xp']))
+		sys.stdout.write(' "' + name + ' to-next-level" GAUGE Experience ' + str(account_data['races'][key]['xp_tnl']))
+	for (name, points) in account_data['achievement_points'].iteritems():
+		sys.stdout.write(' "' + name + ' achievement points" GAUGE Points ' + str(points))
+	sys.stdout.write("\n")
+# }}}
+

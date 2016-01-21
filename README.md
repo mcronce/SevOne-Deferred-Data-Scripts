@@ -628,6 +628,29 @@ as an example URL, we have the following:
 
 
 
+games/starcraft-2
+==============
+* Language:  Python
+* Type:      API
+* Reference: http://us.battle.net/sc2/en/
+* Usage:
+
+
+    starcraft-2 ProfilePath
+    starcraft-2 8072831/1/Derp
+
+This processor scrapes statistics about a Starcraft 2 profile from Blizzard's
+community stats API.
+
+To find the ProfilePath for your account, look at the URL for your web profile;
+as an example URL, we have the following:
+
+    http://us.battle.net/sc2/en/profile/8072831/1/Derp/
+
+"8072831/1/Derp" would be the ProfilePath, in this case.
+
+
+
 magelo-eq
 =========
 * Language:  Python 2.7
