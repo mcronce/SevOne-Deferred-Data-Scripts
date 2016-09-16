@@ -194,6 +194,10 @@ function parse_data_line($line) { // {{{
 			$indicator['display_units'] = $indicator['units'];
 			unset($indicator['units']);
 		}
+		if(preg_match(':(.+)/(.+):', $indicator['value'], $matches)) {
+			$indicator['value'] = $matches[1];
+			$indicator['maxValue'] = $matches[2];
+		}
 	}
 
 	return $output;
