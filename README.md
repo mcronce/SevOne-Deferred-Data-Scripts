@@ -675,3 +675,22 @@ profile; as an example URL, we have the following:
 Currently, you must run a separate script for each profile ID you wish to
 poll.  That will change in the future.
 
+
+
+pi-hole
+=======
+* Language:  Python 2.7
+* Type:      API
+* Reference: https://pi-hole.net/
+* Usage:
+
+
+    pi-hole hostname-or-IP
+	pi-hole dns.localdomain
+	pi-hole 192.168.1.201
+
+This processor connects to a Pi-Hole DNS server's API and scrapes the
+statistics that it exports.
+
+You simply pass it the hostname or IP address of the Pi-Hole server.
+

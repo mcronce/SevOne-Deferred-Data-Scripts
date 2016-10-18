@@ -1,0 +1,71 @@
+#!/usr/bin/python2.7
+
+import datetime
+import json
+import optparse
+import socket
+import sys
+import time
+import urllib
+import urllib2
+
+# CLEVERLY NAMED function to retrieve a remote URL
+def curl(url, data = None, headers = None): # {{{
+	req = urllib2.Request(url)
+
+	if(headers != None):
+		for key in headers.iterkeys():
+			req.add_header(key, headers[key])
+
+	if(data != None):
+		req.add_data(urllib.urlencode(data))
+
+	try:
+		handle = urllib2.urlopen(req)
+	except IOError, e:
+		return ''
+
+	data = handle.read().replace('//', '')
+	return data
+# }}}
+
+def curlJson(url, **kwargs): # {{{
+	jsonSuccess = False
+	failCount = 0
+	while(failCount < 5 and not jsonSuccess):
+		try:
+			daters = curl(url, **kwargs)
+			daters = json.loads(daters)
+			jsonSuccess = True
+		except Exception, e:
+			print e
+			failCount = failCount + 1
+			jsonSuccess = False
+	if(failCount >= 5):
+		sys.exit(1)
+	return daters
+# }}}
+
+# parse command-line arguments {{{
+cmdline = optparse.OptionParser(usage = 'usage: %prog [options] WOEID')
+
+(options, args) = cmdline.parse_args()
+if(len(args) != 1):
+	cmdline.print_help()
+	sys.exit(1)
+
+(host,) = args
+# }}}
+
+pihole_data = curlJson('http://' + host + '/admin/api.php', headers = {'Accept' : 'application/json'})
+timestamp = int(time.mktime(datetime.datetime.now().timetuple()))
+
+sys.stdout.write(str(timestamp) + ' "' + host + ' Pi-Hole data" "Pi-Hole data" "Pi-Hole data"')
+sys.stdout.write(' "Domains being blocked" GAUGE Domains ' + str(pihole_data['domains_being_blocked']))
+sys.stdout.write(' "DNS queries /sec" COUNTER64 Queries ' + str(pihole_data['dns_queries_today']))
+sys.stdout.write(' "DNS queries today" GAUGE Queries ' + str(pihole_data['dns_queries_today']))
+sys.stdout.write(' "Ads blocked /sec" COUNTER32 Queries ' + str(pihole_data['ads_blocked_today']))
+sys.stdout.write(' "Ads blocked today" GAUGE Queries ' + str(pihole_data['ads_blocked_today']))
+sys.stdout.write(' "Today\'s traffic % ads" GAUGE Percent ' + str(pihole_data['ads_percentage_today']))
+sys.stdout.write("\n")
+
